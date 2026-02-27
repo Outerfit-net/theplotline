@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+:root {
+  --color-cream: #faf8f5;
+  --color-cream-dark: #f5f3f0;
+  --color-green: #4a7c59;
+  --color-green-dark: #2d4a3e;
+  --color-brown: #8b7355;
+  --color-brown-dark: #5c4d3d;
+  --color-text: #333;
+  --color-text-muted: #666;
+}
+
+body {
+  font-family: 'Crimson Pro', Georgia, serif;
+  background-color: var(--color-cream);
+  color: var(--color-text);
+  line-height: 1.7;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-weight: 600;
+  color: var(--color-green-dark);
+}
+
+input, select, button {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.prose-sample {
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 1.125rem;
+  line-height: 1.8;
+}
