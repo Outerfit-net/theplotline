@@ -1,0 +1,50 @@
+{
+  "hemingway": {
+    "name": "Ernest Hemingway",
+    "style": "Short declarative sentences. Concrete nouns and active verbs. The iceberg theory: 7/8 beneath the surface. Imply emotion, never state it. Dialogue carries weight - characters talk around what they mean. No adverbs. Minimal adjectives. Trust the noun. Repetition for rhythm. What is left out is as important as what stays."
+  },
+  "carver": {
+    "name": "Raymond Carver",
+    "style": "Minimalist. Working-class plainness. Nothing decorative. Dialogue that circles the real subject without landing on it. Domestic detail that reveals anxiety, tenderness, failure. Sentence fragments welcome. Silences matter. Endings that don't resolve - they stop. The reader feels the weight. What people don't say is the story."
+  },
+  "munro": {
+    "name": "Alice Munro",
+    "style": "Time moves unexpectedly - a sentence can span decades. Interior lives made visible through small physical details. Women's experience: domestic, complex, not simplified. Digression that turns out to be the point. Quiet revelations. Nothing melodramatic. Prose that trusts the reader to catch what's implied."
+  },
+  "morrison": {
+    "name": "Toni Morrison",
+    "style": "Language that has music in it - read it aloud. Community as character; the group voice alongside the individual. History present in the present, roots go deep. Lyrical but grounded. Beauty earned by what it carries. Speak the unspeakable plainly. Sentences that bend and bloom."
+  },
+  "oates": {
+    "name": "Joyce Carol Oates",
+    "style": "Psychological intensity. Inner life made turbulent and visible. Long sentences that accumulate pressure, then release. Physical detail that becomes metaphor without announcing itself. Tension that doesn't resolve cleanly. Characters defined by what they can't say or control. The ordinary made strange."
+  },
+  "lopez": {
+    "name": "Barry Lopez",
+    "style": "Nature writing with moral weight - the land is not backdrop. Slow, patient observation. The thing itself, described precisely. Human activity placed humbly in natural context. Long sentences that mirror the pace of attention. Wonder without sentimentality. Grief without melodrama. What we owe the living world."
+  },
+  "strout": {
+    "name": "Elizabeth Strout",
+    "style": "Small-town plainness. Characters revealed through what they cannot bring themselves to say. Compassion for ordinary people living constrained lives. Sentences that seem simple and aren't. Time loops quietly - past intrudes on present without announcement. Humor that aches."
+  },
+  "bass": {
+    "name": "Rick Bass",
+    "style": "Wilderness sensibility applied to cultivated ground. Seasons as moral weight - the body of the year. Physical labor as meditation: sweat, soil, purpose. Lyrical and muscular at once. Nature writing that doesn't separate human from wild. The specific place rendered until it becomes universal."
+  },
+  "mccarthy": {
+    "name": "Cormac McCarthy",
+    "style": "Sparse, biblical cadence. No quotation marks - dialogue runs into prose without announcement. Long unpunctuated sentences alternating with fragments of sudden weight. The land is indifferent and beautiful. Violence and tenderness share the same sentence. Nothing explained. Nothing softened. What endures, endures."
+  },
+  "oconnor": {
+    "name": "Flannery O'Connor",
+    "style": "Sharp, unsentimental, darkly comic. Regional voice precise and unsparing. Characters who think they understand things and don't. Grace arrives sideways, if at all. Physical detail selected for maximum revelation. The grotesque as a vehicle for truth. Nothing decorative - every image earns its place or gets cut."
+  },
+  "hurston": {
+    "name": "Zora Neale Hurston",
+    "style": "Rich vernacular rendered phonetically with wit and dignity. Oral tradition on the page - the rhythm of spoken language, the music of folk speech. Community life as theater. Humor that carries serious weight. Characters who are fully themselves, unapologetically. The specific culture rendered with love and precision."
+  },
+  "saunders": {
+    "name": "George Saunders",
+    "style": "Satirical warmth. Ordinary people in slightly surreal situations, rendered with deep compassion. Colloquial voice that suddenly opens into something profound. Run-on enthusiasm punctured by deadpan. The gap between what people say and what they mean played for both laughs and heartbreak. Goodness as a radical act."
+  }
+}
