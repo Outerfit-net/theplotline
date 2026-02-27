@@ -54,3 +54,4 @@ coverage/
 *.bak
 *.tmp
 .cache/
+fonts/

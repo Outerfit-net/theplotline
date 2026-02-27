@@ -92,3 +92,22 @@ CREATE TABLE IF NOT EXISTS authors (
 );
 
 CREATE INDEX IF NOT EXISTS idx_authors_active ON authors(active);
+
+-- Mastheads table (lazy-generated bitmap images, cached forever)
+-- Combinatorial: station × author × weather_type × season (~35K possible)
+CREATE TABLE IF NOT EXISTS mastheads (
+    id TEXT PRIMARY KEY,
+    station_code TEXT NOT NULL,
+    author_key TEXT NOT NULL,
+    weather_type TEXT NOT NULL,  -- sunny, cloudy, rainy, snowy, foggy, etc.
+    season TEXT NOT NULL,        -- spring, summer, fall, winter
+    name TEXT NOT NULL,          -- e.g., "The Frost Line", "Notes from the Mud"
+    image_url TEXT,              -- CDN URL or local path to generated bitmap
+    image_data BLOB,             -- fallback: stored image data if no CDN
+    generated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(station_code, author_key, weather_type, season)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mastheads_lookup ON mastheads(station_code, author_key, weather_type, season);
+CREATE INDEX IF NOT EXISTS idx_mastheads_station ON mastheads(station_code);
+CREATE INDEX IF NOT EXISTS idx_mastheads_season ON mastheads(season);
