@@ -33,6 +33,7 @@ async function start() {
   // Register routes
   fastify.register(subscriberRoutes, { prefix: '/api' });
   fastify.register(authorRoutes, { prefix: '/api' });
+  fastify.register(require('./routes/admin'), { prefix: '/api' });
 
   // Register cron jobs
   registerCrons();

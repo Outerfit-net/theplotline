@@ -8,7 +8,7 @@ const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
-const EMAIL_FROM = process.env.EMAIL_FROM || SMTP_USER;
+const EMAIL_FROM = process.env.SMTP_FROM || process.env.EMAIL_FROM || SMTP_USER;
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3001';
 
 // Create transporter

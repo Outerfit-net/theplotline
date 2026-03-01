@@ -1,112 +1,174 @@
 #!/usr/bin/env python3
 """
-Masthead Generator for Plot Lines
-Generates PNG masthead images using garden fonts
+Plot Lines Masthead Generator
+Generates a 600x100px PNG masthead for a given (station, author, season, weather) combo.
+Lazy: checks cache first, generates only if missing.
+
+Usage:
+    python3 generate_masthead.py <station> <author> <season> <weather> [--output /path/out.png]
+    python3 generate_masthead.py BOU hemingway fall frost
+    python3 generate_masthead.py BOU hemingway fall frost --batch
 """
 
-import os
-import random
-import hashlib
+import sys, os, hashlib
+from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
-# Paths
-FONTS_DIR = os.path.expanduser("~/Documents/theplotline/fonts")
-OUTPUT_DIR = os.path.expanduser("~/Documents/theplotline/mastheads")
-MASTHEAD_NAMES = {
-    "spring": ["The First Bloom", "Sprout Notes", "Emergence", "Budding", "The Green Wave"],
-    "summer": ["High Summer", "The Heat Letter", "Midseason", "Sunlit Rows", "The Long Day"],
-    "fall": ["The Frost Line", "Notes from the Mud", "Harvest Letter", "The Last Bloom", "Falling"],
-    "winter": ["The Dormant", "Winter Plot", "Frost & Folly", "The Cold Frame", "Snow Days"],
-    # Weather-based
-    "sunny": ["Sun Days", "Bright Plot", "The Sunny Side"],
-    "rainy": ["Rain Notes", "The Wet Garden", "Droplets"],
-    "cloudy": ["Overcast", "The Grey Row", "Muted"],
-    "snowy": ["Snow Plot", "The White Garden", "Frost Line"],
+DATA_DIR      = Path(os.environ.get("DATA_DIR", "/opt/plotlines/data"))
+MASTHEAD_DIR  = DATA_DIR / "mastheads"
+FONT_DIR      = Path(os.environ.get("FONT_DIR", "/opt/plotlines/fonts"))
+FALLBACK_FONTS = Path("/usr/share/fonts/truetype/dejavu")
+
+WIDTH, HEIGHT = 600, 100
+
+TITLES = {
+    ("spring","sunny"):  "The First Bloom",
+    ("spring","cloudy"): "Sprout Notes",
+    ("spring","rainy"):  "Notes from the Mud",
+    ("spring","snowy"):  "The Late Thaw",
+    ("spring","frost"):  "The Late Thaw",
+    ("spring","heat"):   "The Green Wave",
+    ("summer","sunny"):  "High Summer",
+    ("summer","cloudy"): "Midseason",
+    ("summer","rainy"):  "The Long Day",
+    ("summer","snowy"):  "High Summer",
+    ("summer","frost"):  "High Summer",
+    ("summer","heat"):   "The Dry Spell Dispatch",
+    ("fall","sunny"):    "Harvest Letter",
+    ("fall","cloudy"):   "The Last Bloom",
+    ("fall","rainy"):    "Notes from the Mud",
+    ("fall","snowy"):    "The Frost Line",
+    ("fall","frost"):    "The Frost Line",
+    ("fall","heat"):     "The Burn",
+    ("winter","sunny"):  "The Cold Frame",
+    ("winter","cloudy"): "The Dormant",
+    ("winter","rainy"):  "Frost & Folly",
+    ("winter","snowy"):  "Snow Days",
+    ("winter","frost"):  "Winter Plot",
+    ("winter","heat"):   "The Cold Frame",
 }
 
-def get_random_font():
-    """Pick a random garden font"""
-    font_files = []
-    for root, dirs, files in os.walk(FONTS_DIR):
-        for f in files:
-            if f.endswith(('.ttf', '.otf')):
-                font_files.append(os.path.join(root, f))
-    return random.choice(font_files) if font_files else None
+PALETTES = {
+    "spring": {
+        "sunny":  {"bg":(240,245,220),"text":(50,80,40),  "accent":(120,160,80)},
+        "cloudy": {"bg":(220,230,215),"text":(60,80,55),  "accent":(140,160,120)},
+        "rainy":  {"bg":(200,215,210),"text":(50,75,70),  "accent":(100,140,130)},
+        "snowy":  {"bg":(235,240,245),"text":(70,90,100), "accent":(140,170,180)},
+        "frost":  {"bg":(230,238,245),"text":(60,85,100), "accent":(130,165,185)},
+        "heat":   {"bg":(245,242,210),"text":(80,90,30),  "accent":(160,170,60)},
+    },
+    "summer": {
+        "sunny":  {"bg":(245,240,200),"text":(80,60,20),  "accent":(180,140,40)},
+        "cloudy": {"bg":(225,230,210),"text":(60,70,40),  "accent":(130,150,80)},
+        "rainy":  {"bg":(210,225,215),"text":(40,70,60),  "accent":(90,140,110)},
+        "snowy":  {"bg":(240,240,230),"text":(70,80,60),  "accent":(140,160,110)},
+        "frost":  {"bg":(235,240,235),"text":(60,80,65),  "accent":(130,160,120)},
+        "heat":   {"bg":(255,235,185),"text":(120,60,10), "accent":(200,120,30)},
+    },
+    "fall": {
+        "sunny":  {"bg":(245,225,185),"text":(100,55,20), "accent":(190,110,30)},
+        "cloudy": {"bg":(220,210,190),"text":(80,65,40),  "accent":(160,130,70)},
+        "rainy":  {"bg":(200,200,185),"text":(70,70,55),  "accent":(130,120,80)},
+        "snowy":  {"bg":(235,230,220),"text":(80,75,65),  "accent":(160,145,110)},
+        "frost":  {"bg":(220,225,230),"text":(65,75,90),  "accent":(120,140,165)},
+        "heat":   {"bg":(255,215,160),"text":(130,60,10), "accent":(210,100,20)},
+    },
+    "winter": {
+        "sunny":  {"bg":(235,240,245),"text":(60,80,100), "accent":(120,155,185)},
+        "cloudy": {"bg":(215,220,225),"text":(65,75,85),  "accent":(120,140,160)},
+        "rainy":  {"bg":(205,215,220),"text":(55,70,80),  "accent":(100,130,150)},
+        "snowy":  {"bg":(240,245,252),"text":(70,90,110), "accent":(150,175,200)},
+        "frost":  {"bg":(228,235,245),"text":(55,75,100), "accent":(120,155,195)},
+        "heat":   {"bg":(240,235,225),"text":(80,75,60),  "accent":(155,145,110)},
+    },
+}
 
-def get_masthead_name(season="spring", weather="sunny"):
-    """Generate a masthead name based on season/weather"""
-    names = MASTHEAD_NAMES.get(season, MASTHEAD_NAMES["spring"])
-    if weather in MASTHEAD_NAMES:
-        names = names + MASTHEAD_NAMES[weather]
-    return random.choice(names)
+# When garden fonts land in FONT_DIR, map author → preferred filename here
+AUTHOR_FONTS = {
+    "hemingway": "DejaVuSerif-Bold.ttf",
+    "carver":    "DejaVuSerif.ttf",
+    "morrison":  "DejaVuSerif-Bold.ttf",
+    "mccarthy":  "DejaVuSerif-Bold.ttf",
+    "oconnor":   "DejaVuSerif-Bold.ttf",
+    "hurston":   "DejaVuSerif-Bold.ttf",
+    "default":   "DejaVuSerif.ttf",
+}
 
-def generate_masthead(station_code, author_key, season="spring", weather="sunny", width=800, height=200):
-    """Generate a masthead PNG"""
-    
-    # Get font and name
-    font_path = get_random_font()
-    masthead_name = get_masthead_name(season, weather)
-    
-    if not font_path:
-        raise Exception("No fonts found")
-    
-    # Create image with gradient background (garden-y colors)
-    img = Image.new('RGB', (width, height), color=(245, 250, 240))
+def load_font(author, size):
+    name = AUTHOR_FONTS.get(author, AUTHOR_FONTS["default"])
+    for base in [FONT_DIR, FALLBACK_FONTS]:
+        p = base / name
+        if p.exists():
+            return ImageFont.truetype(str(p), size)
+    return ImageFont.load_default()
+
+def cache_key(station, author, season, weather):
+    return hashlib.md5(f"{station}:{author}:{season}:{weather}".encode()).hexdigest()
+
+def generate(station, author, season, weather, output_path=None):
+    MASTHEAD_DIR.mkdir(parents=True, exist_ok=True)
+    season, weather, author = season.lower(), weather.lower(), author.lower()
+
+    key  = cache_key(station, author, season, weather)
+    out  = output_path or (MASTHEAD_DIR / f"{key}.png")
+    if out.exists() and not output_path:
+        return out  # cache hit
+
+    pal      = PALETTES.get(season, PALETTES["spring"]).get(weather, {"bg":(240,245,220),"text":(50,80,40),"accent":(120,160,80)})
+    title    = TITLES.get((season, weather), "Plot Lines")
+    subtitle = f"plotlines.com  ·  {season.capitalize()}"
+
+    img  = Image.new("RGB", (WIDTH, HEIGHT), pal["bg"])
     draw = ImageDraw.Draw(img)
-    
-    # Add subtle border
-    draw.rectangle([0, 0, width-1, height-1], outline=(45, 90, 45), width=3)
-    
-    # Try to load the font (fallback to default if needed)
-    try:
-        font = ImageFont.truetype(font_path, 72)
-        author_font = ImageFont.truetype(font_path, 36)
-    except:
-        font = ImageFont.load_default()
-        author_font = ImageFont.load_default()
-    
-    # Draw masthead name
-    bbox = draw.textbbox((0, 0), masthead_name, font=font)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
-    x = (width - text_width) // 2
-    y = (height - text_height) // 2 - 20
-    
-    draw.text((x, y), masthead_name, fill=(45, 75, 45), font=font)
-    
-    # Draw station and author
-    subtitle = f"{station_code.upper()} • {author_key}"
-    bbox2 = draw.textbbox((0, 0), subtitle, font=author_font)
-    sub_width = bbox2[2] - bbox2[0]
-    sub_x = (width - sub_width) // 2
-    draw.text((sub_x, y + text_height + 10), subtitle, fill=(90, 120, 90), font=author_font)
-    
-    # Generate unique filename
-    key = f"{station_code}-{author_key}-{season}-{weather}"
-    hash_key = hashlib.md5(key.encode()).hexdigest()[:8]
-    filename = f"masthead_{hash_key}.png"
-    output_path = os.path.join(OUTPUT_DIR, filename)
-    
-    # Save
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    img.save(output_path, "PNG")
-    
-    return {
-        "filename": filename,
-        "masthead_name": masthead_name,
-        "font_used": os.path.basename(font_path),
-        "path": output_path,
-        "url": f"https://glyphmatic.us/mastheads/{filename}"
-    }
+
+    # Borders
+    draw.rectangle([0,0,WIDTH-1,HEIGHT-1], outline=pal["accent"], width=2)
+    draw.rectangle([4,4,WIDTH-5,HEIGHT-5], outline=pal["accent"], width=1)
+
+    # Corner marks
+    for cx, cy in [(10,10),(WIDTH-10,10),(10,HEIGHT-10),(WIDTH-10,HEIGHT-10)]:
+        draw.line([(cx-4,cy),(cx+4,cy)], fill=pal["accent"], width=1)
+        draw.line([(cx,cy-4),(cx,cy+4)], fill=pal["accent"], width=1)
+
+    # Rules
+    draw.line([(14,22),(WIDTH-14,22)], fill=pal["accent"], width=1)
+    draw.line([(14,HEIGHT-23),(WIDTH-14,HEIGHT-23)], fill=pal["accent"], width=1)
+
+    # Title
+    tfont = load_font(author, 36)
+    sfont = load_font(author, 11)
+
+    bbox = draw.textbbox((0,0), title, font=tfont)
+    tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
+    tx = (WIDTH - tw) // 2
+    ty = (HEIGHT - th) // 2 - 8
+    draw.text((tx, ty), title, font=tfont, fill=pal["text"])
+
+    # Subtitle
+    sbbox = draw.textbbox((0,0), subtitle, font=sfont)
+    sx = (WIDTH - (sbbox[2]-sbbox[0])) // 2
+    draw.text((sx, ty+th+5), subtitle, font=sfont, fill=pal["accent"])
+
+    img.save(str(out), "PNG", optimize=True)
+    return out
 
 if __name__ == "__main__":
-    import sys
-    station = sys.argv[1] if len(sys.argv) > 1 else "80303"
-    author = sys.argv[2] if len(sys.argv) > 2 else "hemingway"
-    season = sys.argv[3] if len(sys.argv) > 3 else "spring"
-    weather = sys.argv[4] if len(sys.argv) > 4 else "sunny"
-    
-    result = generate_masthead(station, author, season, weather)
-    print(f"Generated: {result['url']}")
-    print(f"Masthead name: {result['masthead_name']}")
-    print(f"Font: {result['font_used']}")
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument("station")
+    p.add_argument("author")
+    p.add_argument("season", choices=["spring","summer","fall","winter"])
+    p.add_argument("weather", choices=["sunny","cloudy","rainy","snowy","frost","heat"])
+    p.add_argument("--output")
+    p.add_argument("--batch", action="store_true", help="Generate all 24 combos for this station/author")
+    args = p.parse_args()
+
+    if args.batch:
+        for s in ["spring","summer","fall","winter"]:
+            for w in ["sunny","cloudy","rainy","snowy","frost","heat"]:
+                path = generate(args.station, args.author, s, w)
+                print(f"{s:8} {w:8} → {path}")
+    else:
+        out = generate(args.station, args.author, args.season, args.weather,
+                       Path(args.output) if args.output else None)
+        print(out)

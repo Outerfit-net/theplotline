@@ -1,15 +1,51 @@
 -- Plot Lines Database Schema
 -- SQLite with better-sqlite3
+-- v2: Global climate zone system
 
--- Subscribers table
+-- ─── CLIMATE ZONES ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS climate_zones (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    koppen_codes TEXT,             -- JSON array
+    representative_cities TEXT,    -- JSON array
+    hemisphere TEXT DEFAULT 'N',
+    micro_seasons_built INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- ─── MICRO SEASONS ───────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS micro_seasons (
+    id TEXT PRIMARY KEY,
+    climate_zone_id TEXT NOT NULL,
+    season_number INTEGER NOT NULL,
+    day_of_year_start INTEGER NOT NULL,
+    day_of_year_end INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    observable_signal TEXT,
+    topic_weights TEXT NOT NULL,   -- JSON object
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(climate_zone_id, season_number),
+    FOREIGN KEY (climate_zone_id) REFERENCES climate_zones(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_micro_seasons_zone ON micro_seasons(climate_zone_id);
+CREATE INDEX IF NOT EXISTS idx_micro_seasons_doy ON micro_seasons(day_of_year_start, day_of_year_end);
+
+-- ─── SUBSCRIBERS ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS subscribers (
     id TEXT PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
     location_city TEXT,
     location_state TEXT,
+    location_country TEXT DEFAULT 'US',
+    lat REAL,
+    lon REAL,
+    timezone TEXT,
+    hemisphere TEXT DEFAULT 'N',
     author_key TEXT DEFAULT 'hemingway',
+    climate_zone_id TEXT,
     station_code TEXT,
-    timezone TEXT DEFAULT 'America/Denver',
     active INTEGER DEFAULT 1,
     created_at TEXT DEFAULT (datetime('now')),
     confirmed_at TEXT,
@@ -17,7 +53,8 @@ CREATE TABLE IF NOT EXISTS subscribers (
     stripe_customer_id TEXT,
     subscription_id TEXT,
     confirm_token TEXT,
-    unsubscribe_token TEXT
+    unsubscribe_token TEXT,
+    FOREIGN KEY (climate_zone_id) REFERENCES climate_zones(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_subscribers_email ON subscribers(email);
@@ -25,25 +62,47 @@ CREATE INDEX IF NOT EXISTS idx_subscribers_station ON subscribers(station_code);
 CREATE INDEX IF NOT EXISTS idx_subscribers_active ON subscribers(active);
 CREATE INDEX IF NOT EXISTS idx_subscribers_confirm_token ON subscribers(confirm_token);
 CREATE INDEX IF NOT EXISTS idx_subscribers_unsubscribe_token ON subscribers(unsubscribe_token);
+CREATE INDEX IF NOT EXISTS idx_subscribers_climate_zone ON subscribers(climate_zone_id);
 
--- Combinations table (unique station + author pairs for caching)
+-- ─── COMBINATIONS ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS combinations (
     id TEXT PRIMARY KEY,
-    station_code TEXT NOT NULL,
+    location_key TEXT NOT NULL,
     author_key TEXT NOT NULL,
+    climate_zone_id TEXT,
     location_city TEXT,
     location_state TEXT,
+    location_country TEXT DEFAULT 'US',
     lat REAL,
     lon REAL,
+    hemisphere TEXT DEFAULT 'N',
+    timezone TEXT,
+    station_code TEXT,
+    weather_source TEXT DEFAULT 'nws',
     garden_context TEXT,
     garden_context_fetched_at TEXT,
-    UNIQUE(station_code, author_key)
+    UNIQUE(location_key, author_key),
+    FOREIGN KEY (climate_zone_id) REFERENCES climate_zones(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_combinations_station ON combinations(station_code);
+CREATE INDEX IF NOT EXISTS idx_combinations_location ON combinations(location_key);
 CREATE INDEX IF NOT EXISTS idx_combinations_author ON combinations(author_key);
+CREATE INDEX IF NOT EXISTS idx_combinations_station ON combinations(station_code);
+CREATE INDEX IF NOT EXISTS idx_combinations_zone ON combinations(climate_zone_id);
 
--- Daily runs table (generated content per combination per day)
+-- ─── TOPIC WHEEL STATE ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS topic_wheel_state (
+    combination_id TEXT NOT NULL,
+    category_id TEXT NOT NULL,
+    last_used_date TEXT,
+    last_topic TEXT,
+    PRIMARY KEY (combination_id, category_id),
+    FOREIGN KEY (combination_id) REFERENCES combinations(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wheel_combination ON topic_wheel_state(combination_id);
+
+-- ─── DAILY RUNS ──────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS daily_runs (
     id TEXT PRIMARY KEY,
     combination_id TEXT NOT NULL,
@@ -52,6 +111,8 @@ CREATE TABLE IF NOT EXISTS daily_runs (
     prose_text TEXT,
     prose_html TEXT,
     topic TEXT,
+    topic_category TEXT,
+    micro_season_id TEXT,
     quote TEXT,
     author_name TEXT,
     weather_summary TEXT,
@@ -59,14 +120,15 @@ CREATE TABLE IF NOT EXISTS daily_runs (
     generated_at TEXT,
     generation_ms INTEGER,
     UNIQUE(combination_id, run_date),
-    FOREIGN KEY (combination_id) REFERENCES combinations(id)
+    FOREIGN KEY (combination_id) REFERENCES combinations(id),
+    FOREIGN KEY (micro_season_id) REFERENCES micro_seasons(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_daily_runs_combination ON daily_runs(combination_id);
 CREATE INDEX IF NOT EXISTS idx_daily_runs_date ON daily_runs(run_date);
 CREATE INDEX IF NOT EXISTS idx_daily_runs_status ON daily_runs(status);
 
--- Deliveries table (email sends per subscriber per daily run)
+-- ─── DELIVERIES ──────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS deliveries (
     id TEXT PRIMARY KEY,
     daily_run_id TEXT NOT NULL,
@@ -82,7 +144,7 @@ CREATE INDEX IF NOT EXISTS idx_deliveries_run ON deliveries(daily_run_id);
 CREATE INDEX IF NOT EXISTS idx_deliveries_subscriber ON deliveries(subscriber_id);
 CREATE INDEX IF NOT EXISTS idx_deliveries_status ON deliveries(status);
 
--- Authors table (populated from authors.json)
+-- ─── AUTHORS ─────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS authors (
     key TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -93,21 +155,18 @@ CREATE TABLE IF NOT EXISTS authors (
 
 CREATE INDEX IF NOT EXISTS idx_authors_active ON authors(active);
 
--- Mastheads table (lazy-generated bitmap images, cached forever)
--- Combinatorial: station × author × weather_type × season (~35K possible)
+-- ─── MASTHEADS ───────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS mastheads (
     id TEXT PRIMARY KEY,
-    station_code TEXT NOT NULL,
+    location_key TEXT NOT NULL,
     author_key TEXT NOT NULL,
-    weather_type TEXT NOT NULL,  -- sunny, cloudy, rainy, snowy, foggy, etc.
-    season TEXT NOT NULL,        -- spring, summer, fall, winter
-    name TEXT NOT NULL,          -- e.g., "The Frost Line", "Notes from the Mud"
-    image_url TEXT,              -- CDN URL or local path to generated bitmap
-    image_data BLOB,             -- fallback: stored image data if no CDN
+    weather_type TEXT NOT NULL,
+    season TEXT NOT NULL,
+    name TEXT NOT NULL,
+    image_url TEXT,
+    image_data BLOB,
     generated_at TEXT DEFAULT (datetime('now')),
-    UNIQUE(station_code, author_key, weather_type, season)
+    UNIQUE(location_key, author_key, weather_type, season)
 );
 
-CREATE INDEX IF NOT EXISTS idx_mastheads_lookup ON mastheads(station_code, author_key, weather_type, season);
-CREATE INDEX IF NOT EXISTS idx_mastheads_station ON mastheads(station_code);
-CREATE INDEX IF NOT EXISTS idx_mastheads_season ON mastheads(season);
+CREATE INDEX IF NOT EXISTS idx_mastheads_lookup ON mastheads(location_key, author_key, weather_type, season);

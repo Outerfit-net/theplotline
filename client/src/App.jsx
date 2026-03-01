@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import SignupForm from './components/SignupForm';
 import SampleConversation from './components/SampleConversation';
+import About from './pages/About';
+import Background from './pages/Background';
+import Admin from './pages/Admin';
 
-function App() {
+function Home() {
   const [confirmed, setConfirmed] = useState(false);
 
   useEffect(() => {
@@ -14,108 +18,114 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[var(--color-cream)]">
-      {/* Header */}
-      <header className="py-8 px-4 text-center border-b border-[var(--color-cream-dark)]">
-        <h1 className="text-4xl md:text-5xl text-[var(--color-green-dark)] mb-2">
-          Plot Lines
-        </h1>
-        <p className="text-[var(--color-text-muted)] text-lg">
-          Daily garden conversations, delivered to your inbox
+    <main className="max-w-4xl mx-auto px-4 py-12">
+      {confirmed && (
+        <div className="mb-8 p-4 bg-[var(--color-green)] text-white rounded-lg text-center">
+          Your subscription is confirmed! Watch for your first garden conversation soon.
+        </div>
+      )}
+
+      <section className="text-center mb-16">
+        <h2 className="text-3xl text-[var(--color-green-dark)] mb-6">
+          Where fictional gardeners gather to share wisdom
+        </h2>
+        <p className="text-lg text-[var(--color-text-muted)] max-w-2xl mx-auto leading-relaxed">
+          Each morning, a cast of twelve garden characters meet to discuss the day's topic.
+          Their conversations — written in the style of literary masters from Hemingway to Morrison —
+          land in your inbox, tuned to your local weather and season.
         </p>
-      </header>
+      </section>
 
-      <main className="max-w-4xl mx-auto px-4 py-12">
-        {/* Confirmation message */}
-        {confirmed && (
-          <div className="mb-8 p-4 bg-[var(--color-green)] text-white rounded-lg text-center">
-            Your subscription is confirmed! Watch for your first garden conversation soon.
-          </div>
-        )}
+      <section className="mb-16">
+        <h3 className="text-2xl text-[var(--color-green-dark)] mb-6 text-center">A sample conversation</h3>
+        <SampleConversation />
+      </section>
 
-        {/* Hero section */}
-        <section className="text-center mb-16">
-          <h2 className="text-3xl text-[var(--color-green-dark)] mb-6">
-            Where fictional gardeners gather to share wisdom
-          </h2>
-          <p className="text-lg text-[var(--color-text-muted)] max-w-2xl mx-auto leading-relaxed">
-            Each morning, a cast of twelve garden characters meet to discuss the day's topic.
-            Their conversations — written in the style of literary masters from Hemingway to Morrison —
-            land in your inbox, tuned to your local weather and season.
-          </p>
-        </section>
+      <section className="mb-16">
+        <h3 className="text-2xl text-[var(--color-green-dark)] mb-6 text-center">Join the garden</h3>
+        <SignupForm />
+      </section>
 
-        {/* Sample conversation */}
-        <section className="mb-16">
-          <h3 className="text-2xl text-[var(--color-green-dark)] mb-6 text-center">
-            A sample conversation
-          </h3>
-          <SampleConversation />
-        </section>
+      <section className="mb-16">
+        <h3 className="text-2xl text-[var(--color-green-dark)] mb-6 text-center">Meet the gardeners</h3>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            { name: 'Buck Thorn', desc: 'Practical and tool-oriented. Fixes things. Not interested in why, just how.' },
+            { name: 'Harry Kvetch', desc: 'Grumpy, specific complaints. Usually right despite himself.' },
+            { name: 'Miss Canthus', desc: 'Poetic, immaculate lawn. Quotes grass names in Latin without apology.' },
+            { name: 'Poppy Seed', desc: 'Enthusiastic about seed trials. Writes in CAPS when excited.' },
+            { name: 'Edie Bell', desc: 'Community feeding is the point. Deep ancestral relationship to soil.' },
+            { name: 'Muso Maple', desc: 'Japanese garden sensibility. Knows all 72 micro-seasons. Often just one sentence.' },
+          ].map(char => (
+            <div key={char.name} className="p-4 bg-white rounded-lg border border-[var(--color-cream-dark)]">
+              <h4 className="font-semibold text-[var(--color-green)]">{char.name}</h4>
+              <p className="text-sm text-[var(--color-text-muted)]">{char.desc}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-center text-[var(--color-text-muted)] mt-4">
+          Plus six more: Ivy League, Chelsea Flower, Buster Native, Esther Potts, Herb Berryman, and Fern Young.
+        </p>
+      </section>
 
-        {/* Signup section */}
-        <section className="mb-16">
-          <h3 className="text-2xl text-[var(--color-green-dark)] mb-6 text-center">
-            Join the garden
-          </h3>
-          <SignupForm />
-        </section>
+      <section className="mb-16">
+        <h3 className="text-2xl text-[var(--color-green-dark)] mb-6 text-center">Choose your voice</h3>
+        <p className="text-center text-[var(--color-text-muted)] mb-6">
+          Each conversation is rendered in the style of a literary master:
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          {['Hemingway', 'Carver', 'Munro', 'Morrison', 'Oates', 'Lopez',
+            'Strout', 'Bass', 'McCarthy', "O'Connor", 'Hurston', 'Saunders'].map(author => (
+            <span key={author} className="px-3 py-1 bg-[var(--color-cream-dark)] rounded-full text-sm text-[var(--color-brown-dark)]">
+              {author}
+            </span>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
 
-        {/* Characters section */}
-        <section className="mb-16">
-          <h3 className="text-2xl text-[var(--color-green-dark)] mb-6 text-center">
-            Meet the gardeners
-          </h3>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { name: 'Buck Thorn', desc: 'Practical and no-nonsense, with decades of dirt under his nails' },
-              { name: 'Harry Kvetch', desc: 'Perpetual worrier who sees problems everywhere, endearingly' },
-              { name: 'Ms. Canthus', desc: 'Elegant and formal, known to quote poetry at sunrise' },
-              { name: 'Poppy Seed', desc: 'Dreamy optimist who tends to wander off-topic beautifully' },
-              { name: 'Fern Young', desc: 'New gardener with excellent questions and boundless enthusiasm' },
-              { name: 'Edie Bell', desc: 'Elderly and wise, remembers how things used to be done' },
-            ].map(char => (
-              <div key={char.name} className="p-4 bg-white rounded-lg border border-[var(--color-cream-dark)]">
-                <h4 className="font-semibold text-[var(--color-green)]">{char.name}</h4>
-                <p className="text-sm text-[var(--color-text-muted)]">{char.desc}</p>
-              </div>
-            ))}
-          </div>
-          <p className="text-center text-[var(--color-text-muted)] mt-4">
-            Plus six more: Ivy League, Chelsea Flower, Buster Native, Esther Potts, Herb Berryman, and Muso Maple.
-          </p>
-        </section>
+function Nav() {
+  return (
+    <header className="py-6 px-4 border-b border-[var(--color-cream-dark)]">
+      <div className="max-w-4xl mx-auto flex justify-between items-center">
+        <Link to="/" className="text-3xl text-[var(--color-green-dark)] hover:opacity-80">Plot Lines</Link>
+        <nav className="flex gap-6 text-sm text-[var(--color-text-muted)]">
+          <Link to="/about" className="hover:text-[var(--color-green-dark)]">About</Link>
+          <Link to="/how-it-works" className="hover:text-[var(--color-green-dark)]">How it works</Link>
+        </nav>
+      </div>
+      <p className="text-center text-[var(--color-text-muted)] text-sm mt-2">
+        Daily garden conversations, delivered to your inbox
+      </p>
+    </header>
+  );
+}
 
-        {/* Author styles section */}
-        <section className="mb-16">
-          <h3 className="text-2xl text-[var(--color-green-dark)] mb-6 text-center">
-            Choose your voice
-          </h3>
-          <p className="text-center text-[var(--color-text-muted)] mb-6">
-            Each conversation is rendered in the style of a literary master:
-          </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            {[
-              'Hemingway', 'Carver', 'Munro', 'Morrison', 'Oates', 'Lopez',
-              'Strout', 'Bass', 'McCarthy', "O'Connor", 'Hurston', 'Saunders'
-            ].map(author => (
-              <span
-                key={author}
-                className="px-3 py-1 bg-[var(--color-cream-dark)] rounded-full text-sm text-[var(--color-brown-dark)]"
-              >
-                {author}
-              </span>
-            ))}
-          </div>
-        </section>
-      </main>
+function Footer() {
+  return (
+    <footer className="py-8 px-4 text-center border-t border-[var(--color-cream-dark)] text-[var(--color-text-muted)] text-sm">
+      <p>Plot Lines &mdash; Garden conversations, daily</p>
+      <p className="mt-2">Weather-aware. Location-based. Literary.</p>
+    </footer>
+  );
+}
 
-      {/* Footer */}
-      <footer className="py-8 px-4 text-center border-t border-[var(--color-cream-dark)] text-[var(--color-text-muted)] text-sm">
-        <p>Plot Lines &mdash; Garden conversations, daily</p>
-        <p className="mt-2">Weather-aware. Location-based. Literary.</p>
-      </footer>
-    </div>
+function App() {
+  return (
+    <BrowserRouter>
+      <div className="min-h-screen bg-[var(--color-cream)]">
+        <Nav />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/how-it-works" element={<Background />} />
+          <Route path="/admin" element={<Admin />} />
+        </Routes>
+        <Footer />
+      </div>
+    </BrowserRouter>
   );
 }
 
