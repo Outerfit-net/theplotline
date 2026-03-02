@@ -1,4 +1,4 @@
-# Plot Lines — Masthead System Design
+# The Plot Line — Masthead System Design
 
 *Created: 2026-03-01*
 *Status: In Development*
@@ -7,7 +7,7 @@
 
 ## Overview
 
-Every Plot Lines email arrives with a unique masthead — a 600×100px banner image that serves as the artistic identity of that day's edition. The masthead is not decoration. It is the product. Subscribers open the email for the art as much as the conversation.
+Every The Plot Line email arrives with a unique masthead — a 600×100px banner image that serves as the artistic identity of that day's edition. The masthead is not decoration. It is the product. Subscribers open the email for the art as much as the conversation.
 
 The masthead is **generative art**. Organic, painterly, botanical. The opposite of photorealistic. Every morning is a new print that will never exist again.
 

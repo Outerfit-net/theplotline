@@ -1,4 +1,4 @@
-# Plot Lines — Product & Business Plan
+# The Plot Line — Product & Business Plan
 
 *Document created: 2026-02-26*
 *Status: Planning*
@@ -8,7 +8,7 @@
 
 ## What Is It
 
-Plot Lines is an AI-generated garden dialog newsletter. Real gardening characters — 12 distinct personalities with their own voices, opinions, grudges, and obsessions — talk to each other about what's happening in the garden right now, in your region, in your weather, written in the style of your chosen American author.
+The Plot Line is an AI-generated garden dialog newsletter. Real gardening characters — 12 distinct personalities with their own voices, opinions, grudges, and obsessions — talk to each other about what's happening in the garden right now, in your region, in your weather, written in the style of your chosen American author.
 
 Every email is location-aware. Every email is unique. It feels like eavesdropping on your neighbors over the fence.
 
@@ -130,7 +130,7 @@ The newsletter title on the masthead is generative. The URL is always plotlines.
 
 ## The Name
 
-**Plot Lines**
+**The Plot Line**
 
 Triple meaning:
 1. A garden plot — the physical space where food grows
@@ -165,7 +165,7 @@ Characters make cameo appearances in real gardening communities online:
 - **Heirloom seed communities** — Edie, Poppy Seed
 
 Each comment ends with:
-> *"If you'd like to hear more from [Character], visit Plot Lines: plotlines.com"*
+> *"If you'd like to hear more from [Character], visit The Plot Line: plotlines.com"*
 
 ### Workflow
 1. molti finds good post overnight
@@ -233,13 +233,13 @@ Each comment ends with:
 - **Near-zero marginal cost** on local inference
 
 ### The Flywheel
-1. Plot Lines → cash flow
+1. The Plot Line → cash flow
 2. Cash flow → investment fund (molti manages)
 3. Investments compound
 4. Eventually: self-funded AI operation
 
 ### Relationship to outerfit
-- Plot Lines ships first — faster, simpler, proves the model
+- The Plot Line ships first — faster, simpler, proves the model
 - Revenue funds outerfit development (harder problem, bigger TAM)
 - Same DNA: AI that feels personal, location-aware, knows you
 - That's a thesis, not a coincidence

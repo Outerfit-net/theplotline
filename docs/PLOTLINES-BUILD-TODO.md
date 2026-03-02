@@ -1,4 +1,4 @@
-# Plot Lines — Build TODO
+# The Plot Line — Build TODO
 *Generated: 2026-03-01 from reading all docs in /opt/plotlines/docs/*
 *This is what the docs describe vs what is actually built. The gap is the work.*
 
