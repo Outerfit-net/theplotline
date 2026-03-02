@@ -12,10 +12,46 @@ const Database = require('better-sqlite3');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const { sendDailyEmail } = require('../services/email');
+const { getSeasonName } = require('../services/seasonNames');
 
 const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', '..', 'data', 'plotlines.db');
 const PYTHON_PATH = process.env.PYTHON_PATH || 'python3';
 const ENGINE_PATH = path.join(__dirname, '..', 'garden', 'engine.py');
+
+/**
+ * Get author-voiced season name for a daily run
+ * Returns the name, or null if not available
+ */
+async function getAuthorSeasonName(dailyRun, combo, db) {
+  if (!dailyRun.micro_season_id || !combo.climate_zone_id) {
+    return null;
+  }
+
+  try {
+    // Get season number from micro_season_id
+    const microSeason = db.prepare(`
+      SELECT season_number FROM micro_seasons WHERE id = ?
+    `).get(dailyRun.micro_season_id);
+
+    if (!microSeason) {
+      console.warn(`[dispatch] Micro season not found: ${dailyRun.micro_season_id}`);
+      return null;
+    }
+
+    // Get author-voiced season name
+    const seasonName = await getSeasonName(
+      combo.climate_zone_id,
+      combo.author_key,
+      microSeason.season_number,
+      db
+    );
+
+    return seasonName;
+  } catch (err) {
+    console.warn(`[dispatch] Failed to get author season name:`, err.message);
+    return null;
+  }
+}
 
 function getDb() {
   return new Database(DB_PATH);
@@ -187,6 +223,12 @@ async function runDispatch() {
 
         // Get the run for email
         const dailyRun = db.prepare('SELECT * FROM daily_runs WHERE id = ?').get(runId);
+
+        // Attach author-voiced season name if available
+        const authorSeasonName = await getAuthorSeasonName(dailyRun, combo, db);
+        if (authorSeasonName) {
+          dailyRun.author_season_name = authorSeasonName;
+        }
 
         // Send emails
         for (const sub of subscribers) {

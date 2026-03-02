@@ -170,3 +170,17 @@ CREATE TABLE IF NOT EXISTS mastheads (
 );
 
 CREATE INDEX IF NOT EXISTS idx_mastheads_lookup ON mastheads(location_key, author_key, weather_type, season);
+
+-- ─── AUTHOR SEASON NAMES ──────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS author_season_names (
+    id TEXT PRIMARY KEY,
+    climate_zone_id TEXT NOT NULL,
+    author_key TEXT NOT NULL,
+    season_number INTEGER NOT NULL,
+    season_name TEXT NOT NULL,
+    generated_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(climate_zone_id, author_key, season_number),
+    FOREIGN KEY (climate_zone_id) REFERENCES climate_zones(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_asn_zone_author ON author_season_names(climate_zone_id, author_key);

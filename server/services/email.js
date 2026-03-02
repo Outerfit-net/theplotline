@@ -121,6 +121,7 @@ async function sendDailyEmail(email, dailyRun, unsubscribeToken) {
       <div class="container">
         <h1>Garden Conversation</h1>
         <div class="meta">${dailyRun.run_date} | ${dailyRun.author_name || 'Hemingway'} style</div>
+        <div class="meta" style="font-style: italic; color: #4a7c59; margin-top: 8px;">Season: ${dailyRun.author_season_name || ''}</div>
         <div class="weather">${dailyRun.weather_summary || ''}</div>
         <div class="topic">Today: ${dailyRun.topic || 'A moment in the garden'}</div>
         <div class="prose">
@@ -139,6 +140,7 @@ async function sendDailyEmail(email, dailyRun, unsubscribeToken) {
   const text = `
 Garden Conversation - ${dailyRun.run_date}
 Style: ${dailyRun.author_name || 'Hemingway'}
+Season: ${dailyRun.author_season_name || ''}
 
 ${dailyRun.weather_summary || ''}
 
