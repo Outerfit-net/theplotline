@@ -6,6 +6,13 @@ export default function Admin() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Beta invite state
+  const [betaEmail, setBetaEmail] = useState('');
+  const [betaLoading, setBetaLoading] = useState(false);
+  const [betaMessage, setBetaMessage] = useState('');
+  const [betaError, setBetaError] = useState('');
+  const [betaInvites, setBetaInvites] = useState([]);
 
   const token = localStorage.getItem('admin-token');
 
@@ -55,6 +62,67 @@ export default function Admin() {
       });
   }, [authed, token]);
 
+  // Load beta invites
+  useEffect(() => {
+    if (!authed) return;
+    fetch('/api/admin/beta-invites', { headers: { 'x-admin-token': token } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d && d.invites) {
+          setBetaInvites(d.invites);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load beta invites:', err);
+      });
+  }, [authed, token]);
+
+  async function sendBetaInvite(e) {
+    e.preventDefault();
+    if (!betaEmail || !betaEmail.includes('@')) {
+      setBetaError('Invalid email address');
+      return;
+    }
+
+    setBetaLoading(true);
+    setBetaError('');
+    setBetaMessage('');
+
+    try {
+      const res = await fetch('/api/admin/beta-invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-token': token
+        },
+        body: JSON.stringify({ email: betaEmail })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setBetaMessage(`Invite sent to ${betaEmail} — code: ${data.code}`);
+        setBetaEmail('');
+        // Reload invites
+        const invitesRes = await fetch('/api/admin/beta-invites', { 
+          headers: { 'x-admin-token': token } 
+        });
+        if (invitesRes.ok) {
+          const invitesData = await invitesRes.json();
+          if (invitesData.invites) {
+            setBetaInvites(invitesData.invites);
+          }
+        }
+      } else {
+        setBetaError(data.error || 'Failed to send invite');
+      }
+    } catch (err) {
+      setBetaError('Error: ' + err.message);
+    } finally {
+      setBetaLoading(false);
+    }
+  }
+
   if (!authed) return (
     <div className="max-w-sm mx-auto px-4 py-24">
       <h1 className="text-2xl text-[var(--color-green-dark)] mb-8 text-center">Admin</h1>
@@ -103,6 +171,59 @@ export default function Admin() {
           </div>
         ))}
       </div>
+
+      {/* Beta Invites Section */}
+      <section className="mb-12">
+        <h2 className="text-xl text-[var(--color-green-dark)] mb-4">Beta Invites</h2>
+        <div className="bg-white border border-[var(--color-cream-dark)] rounded-lg p-6 mb-6">
+          <form onSubmit={sendBetaInvite} className="space-y-4">
+            <div>
+              <label className="block text-sm text-[var(--color-text-muted)] mb-2">Email address</label>
+              <input
+                type="email"
+                value={betaEmail}
+                onChange={e => setBetaEmail(e.target.value)}
+                placeholder="jane@example.com"
+                className="w-full border border-[var(--color-cream-dark)] rounded px-3 py-2"
+                disabled={betaLoading}
+              />
+            </div>
+            {betaError && <p className="text-red-500 text-sm">{betaError}</p>}
+            {betaMessage && <p className="text-[var(--color-green)] text-sm">{betaMessage}</p>}
+            <button
+              type="submit"
+              disabled={betaLoading}
+              className="bg-[var(--color-green)] text-white py-2 px-4 rounded disabled:opacity-50"
+            >
+              {betaLoading ? 'Sending...' : 'Send Beta Invite'}
+            </button>
+          </form>
+        </div>
+
+        {/* Beta invites table */}
+        {betaInvites.length > 0 && (
+          <div className="bg-white border border-[var(--color-cream-dark)] rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-[var(--color-cream-dark)]">
+                <tr>
+                  <th className="text-left px-4 py-2 text-[var(--color-brown-dark)]">Email</th>
+                  <th className="text-left px-4 py-2 text-[var(--color-brown-dark)]">Code</th>
+                  <th className="text-left px-4 py-2 text-[var(--color-brown-dark)]">Sent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {betaInvites.map((invite, i) => (
+                  <tr key={i} className="border-t border-[var(--color-cream-dark)]">
+                    <td className="px-4 py-2">{invite.email}</td>
+                    <td className="px-4 py-2 font-mono text-[var(--color-green-dark)]">{invite.code}</td>
+                    <td className="px-4 py-2 text-[var(--color-text-muted)]">{invite.sent_at?.slice(0, 10)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {/* By climate zone */}
       <section className="mb-12">
