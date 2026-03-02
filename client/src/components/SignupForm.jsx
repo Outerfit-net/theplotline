@@ -25,6 +25,39 @@ function SignupForm({ onSignupSuccess }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError]     = useState(null);
+  const [turnstileToken, setTurnstileToken] = useState(null);
+
+  // Load Turnstile script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
+  }, []);
+
+  // Initialize Turnstile widget when script loads
+  useEffect(() => {
+    const checkAndRender = () => {
+      if (window.turnstile) {
+        window.turnstile.render('#turnstile-widget', {
+          sitekey: import.meta.env.VITE_TURNSTILE_SITE_KEY,
+          callback: (token) => setTurnstileToken(token),
+          theme: 'light',
+        });
+      } else {
+        setTimeout(checkAndRender, 100);
+      }
+    };
+    
+    checkAndRender();
+  }, []);
 
   useEffect(() => {
     fetch(`${API_URL}/authors`)
@@ -42,7 +75,7 @@ function SignupForm({ onSignupSuccess }) {
     e.preventDefault();
     setLoading(true); setMessage(null); setError(null);
     try {
-      const body = { email, city, country, author };
+      const body = { email, city, country, author, cf_turnstile_response: turnstileToken };
       if (country === 'US' && state) body.state = state;
       if (country === 'US' && zipcode) body.zipcode = zipcode;
 
@@ -64,7 +97,11 @@ function SignupForm({ onSignupSuccess }) {
         });
       }
       
-      setEmail(''); setCity(''); setState(''); setZipcode('');
+      setEmail(''); setCity(''); setState(''); setZipcode(''); setTurnstileToken(null);
+      // Reset Turnstile widget
+      if (window.turnstile) {
+        window.turnstile.reset('#turnstile-widget');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -144,7 +181,12 @@ function SignupForm({ onSignupSuccess }) {
           </a>
         </div>
 
-        <button type="submit" disabled={loading}
+        {/* Cloudflare Turnstile Widget */}
+        <div className="mb-4 flex justify-center">
+          <div id="turnstile-widget"></div>
+        </div>
+
+        <button type="submit" disabled={loading || !turnstileToken}
           className="w-full py-2 px-4 bg-[var(--color-green)] text-white rounded-lg font-medium hover:bg-[var(--color-green-dark)] transition-colors disabled:opacity-50">
           {loading ? 'Subscribing...' : 'Subscribe'}
         </button>

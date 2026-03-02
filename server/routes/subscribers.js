@@ -32,6 +32,41 @@ function buildLocationKey(country, stationCode, lat, lon) {
   return `${rLat}:${rLon}`;
 }
 
+/**
+ * Verify Cloudflare Turnstile token
+ */
+async function verifyTurnstile(cf_turnstile_response, remoteip) {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  
+  // Dev mode: skip verification if secret not set
+  if (!secret) {
+    console.warn('[turnstile] Secret key not set, skipping verification (dev mode)');
+    return { success: true };
+  }
+
+  if (!cf_turnstile_response) {
+    return { success: false, error: 'No Turnstile response provided' };
+  }
+
+  try {
+    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        secret,
+        response: cf_turnstile_response,
+        remoteip: remoteip || undefined,
+      }),
+    });
+
+    const data = await response.json();
+    return data;
+  } catch (err) {
+    console.error('[turnstile] Verification error:', err.message);
+    return { success: false, error: 'Turnstile verification failed' };
+  }
+}
+
 async function subscriberRoutes(fastify) {
 
   // ── POST /api/subscribe ───────────────────────────────────────────────────
@@ -43,6 +78,7 @@ async function subscriberRoutes(fastify) {
       zipcode = '',
       country = 'US',
       author = 'hemingway',
+      cf_turnstile_response,
     } = request.body;
 
     if (!email || !city) {
@@ -52,6 +88,13 @@ async function subscriberRoutes(fastify) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return reply.code(400).send({ error: 'Invalid email format' });
+    }
+
+    // ── Verify Turnstile ──────────────────────────────────────────────────────
+    const turnstileVerification = await verifyTurnstile(cf_turnstile_response, request.ip);
+    if (!turnstileVerification.success) {
+      console.warn('[subscribe] Turnstile verification failed:', turnstileVerification);
+      return reply.code(403).send({ error: 'Bot check failed' });
     }
 
     const db = getDb();
