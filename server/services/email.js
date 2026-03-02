@@ -58,7 +58,7 @@ async function sendConfirmationEmail(email, confirmToken) {
     </head>
     <body>
       <div class="container">
-        <h1>Welcome to The Plot Line</h1>
+        <img src="https://theplotline.net/logo-v4.png" alt="The Plot Line" style="height:70px;width:auto;display:block;margin:0 auto 20px;" />
         <p>Thanks for subscribing to our daily garden conversations!</p>
         <p>Please confirm your email address to start receiving your personalized garden dialogs:</p>
         <a href="${confirmUrl}" class="button">Confirm Subscription</a>
@@ -119,7 +119,7 @@ async function sendDailyEmail(email, dailyRun, unsubscribeToken) {
     </head>
     <body>
       <div class="container">
-        <h1>Garden Conversation</h1>
+        <img src="https://theplotline.net/logo-v4.png" alt="The Plot Line" style="height:70px;width:auto;display:block;margin:0 auto 20px;" />
         <div class="meta">${dailyRun.run_date} | ${dailyRun.author_name || 'Hemingway'} style</div>
         <div class="meta" style="font-style: italic; color: #4a7c59; margin-top: 8px;">Season: ${dailyRun.author_season_name || ''}</div>
         <div class="weather">${dailyRun.weather_summary || ''}</div>
