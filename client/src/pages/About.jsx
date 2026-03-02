@@ -1,11 +1,11 @@
 export default function About() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-12">
-      <h1 className="text-3xl text-[var(--color-green-dark)] mb-8">About Plot Lines</h1>
+      <h1 className="text-3xl text-[var(--color-green-dark)] mb-8">About The Plot Line</h1>
 
       <div className="prose text-[var(--color-text-muted)] space-y-6 leading-relaxed">
         <p>
-          Plot Lines started the way most things do — with a problem that wouldn't let go.
+          The Plot Line started the way most things do — with a problem that wouldn't let go.
         </p>
         <p>
           I've been growing things for most of my adult life. Community gardens, backyard plots,
@@ -28,7 +28,7 @@ export default function About() {
         <p>
           I'm matte_d_scry. I've spent 14 years buying seeds I probably shouldn't, leading a
           community garden plot in Boulder, and watching what happens when you put the right
-          plant in the wrong place. Plot Lines is what I built when I wanted to read something
+          plant in the wrong place. The Plot Line is what I built when I wanted to read something
           I couldn't find anywhere else.
         </p>
         <p className="text-[var(--color-green-dark)] font-medium">

@@ -64,7 +64,7 @@ async function subscriberRoutes(fastify) {
         if (existing.active && existing.confirmed_at) {
           return reply.code(409).send({
             error: 'Email already subscribed',
-            message: 'This email is already subscribed to Plot Lines.'
+            message: 'This email is already subscribed to The Plot Line.'
           });
         }
         // Reactivate or resend

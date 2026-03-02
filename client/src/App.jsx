@@ -90,7 +90,7 @@ function Nav() {
   return (
     <header className="py-6 px-4 border-b border-[var(--color-cream-dark)]">
       <div className="max-w-4xl mx-auto flex justify-between items-center">
-        <Link to="/" className="text-3xl text-[var(--color-green-dark)] hover:opacity-80">Plot Lines</Link>
+        <Link to="/" className="text-3xl text-[var(--color-green-dark)] hover:opacity-80">The Plot Line</Link>
         <nav className="flex gap-6 text-sm text-[var(--color-text-muted)]">
           <Link to="/about" className="hover:text-[var(--color-green-dark)]">About</Link>
           <Link to="/how-it-works" className="hover:text-[var(--color-green-dark)]">How it works</Link>
@@ -106,7 +106,7 @@ function Nav() {
 function Footer() {
   return (
     <footer className="py-8 px-4 text-center border-t border-[var(--color-cream-dark)] text-[var(--color-text-muted)] text-sm">
-      <p>Plot Lines &mdash; Garden conversations, daily</p>
+      <p>The Plot Line &mdash; Garden conversations, daily</p>
       <p className="mt-2">Weather-aware. Location-based. Literary.</p>
     </footer>
   );

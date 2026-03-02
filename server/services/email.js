@@ -58,13 +58,13 @@ async function sendConfirmationEmail(email, confirmToken) {
     </head>
     <body>
       <div class="container">
-        <h1>Welcome to Plot Lines</h1>
+        <h1>Welcome to The Plot Line</h1>
         <p>Thanks for subscribing to our daily garden conversations!</p>
         <p>Please confirm your email address to start receiving your personalized garden dialogs:</p>
         <a href="${confirmUrl}" class="button">Confirm Subscription</a>
         <p>Or copy this link: ${confirmUrl}</p>
         <div class="footer">
-          <p>If you didn't sign up for Plot Lines, you can ignore this email.</p>
+          <p>If you didn't sign up for The Plot Line, you can ignore this email.</p>
         </div>
       </div>
     </body>
@@ -72,19 +72,19 @@ async function sendConfirmationEmail(email, confirmToken) {
   `;
 
   const text = `
-Welcome to Plot Lines!
+Welcome to The Plot Line!
 
 Thanks for subscribing to our daily garden conversations.
 
 Please confirm your email by visiting:
 ${confirmUrl}
 
-If you didn't sign up for Plot Lines, you can ignore this email.
+If you didn't sign up for The Plot Line, you can ignore this email.
   `;
 
   return sendEmail({
     to: email,
-    subject: 'Confirm your Plot Lines subscription',
+    subject: 'Confirm your subscription to The Plot Line',
     html,
     text
   });
@@ -129,7 +129,7 @@ async function sendDailyEmail(email, dailyRun, unsubscribeToken) {
         <div class="quote">${dailyRun.quote || ''}</div>
         <div class="footer">
           <p>Characters: ${dailyRun.characters || 'The usual suspects'}</p>
-          <p><a href="${unsubscribeUrl}">Unsubscribe</a> from Plot Lines</p>
+          <p><a href="${unsubscribeUrl}">Unsubscribe</a> from The Plot Line</p>
         </div>
       </div>
     </body>

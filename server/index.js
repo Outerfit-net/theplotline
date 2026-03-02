@@ -1,5 +1,5 @@
 /**
- * Plot Lines - Fastify Server
+ * The Plot Line - Fastify Server
  * Garden dialog newsletter API
  */
 
