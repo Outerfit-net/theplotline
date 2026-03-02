@@ -76,7 +76,7 @@ function SignupForm({ onSignupSuccess }) {
 
   return (
     <div className="max-w-md mx-auto">
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg border border-[var(--color-cream-dark)]">
+      <form onSubmit={handleSubmit} className="bg-white p-5 rounded-lg border border-[var(--color-cream-dark)]">
         {message && (
           <div className="mb-4 p-3 bg-green-100 text-green-800 rounded-lg text-sm">{message}</div>
         )}
@@ -84,17 +84,17 @@ function SignupForm({ onSignupSuccess }) {
           <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-lg text-sm">{error}</div>
         )}
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-[var(--color-text-muted)] mb-1">Email</label>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-[var(--color-text-muted)] mb-1">Email</label>
           <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-            className="w-full px-4 py-2 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none"
+            className="w-full px-3 py-1.5 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none text-sm"
             placeholder="you@example.com" />
         </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-[var(--color-text-muted)] mb-1">Country</label>
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-[var(--color-text-muted)] mb-1">Country</label>
           <select value={country} onChange={e => { setCountry(e.target.value); setState(''); setZipcode(''); }}
-            className="w-full px-4 py-2 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none bg-white">
+            className="w-full px-3 py-1.5 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none bg-white text-sm">
             {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
           </select>
         </div>
@@ -105,14 +105,14 @@ function SignupForm({ onSignupSuccess }) {
               {isUS ? 'City' : 'City / Town'}
             </label>
             <input type="text" value={city} onChange={e => setCity(e.target.value)} required
-              className="w-full px-4 py-2 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none"
+              className="w-full px-3 py-1.5 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none text-sm"
               placeholder={isUS ? 'Boulder' : 'Your city'} />
           </div>
           {isUS && (
             <div>
               <label className="block text-sm font-medium text-[var(--color-text-muted)] mb-1">State</label>
               <select value={state} onChange={e => setState(e.target.value)}
-                className="w-full px-4 py-2 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none bg-white">
+                className="w-full px-3 py-1.5 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none bg-white text-sm">
                 <option value="">Select...</option>
                 {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -124,16 +124,16 @@ function SignupForm({ onSignupSuccess }) {
           <div className="mb-6">
             <label className="block text-sm font-medium text-[var(--color-text-muted)] mb-1">ZIP Code</label>
             <input type="text" value={zipcode} onChange={e => setZipcode(e.target.value)}
-              className="w-full px-4 py-2 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none"
+              className="w-full px-3 py-1.5 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none text-sm"
               placeholder="Optional" />
             <p className="mt-1 text-xs text-[var(--color-text-muted)]">For more accurate weather forecasts</p>
           </div>
         )}
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-[var(--color-text-muted)] mb-1">Writing Style</label>
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-[var(--color-text-muted)] mb-1">Writing Style</label>
           <select value={author} onChange={e => setAuthor(e.target.value)}
-            className="w-full px-4 py-2 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none bg-white">
+            className="w-full px-3 py-1.5 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none bg-white text-sm">
             {authors.map(a => <option key={a.key} value={a.key}>{a.name}</option>)}
           </select>
           <a
@@ -145,7 +145,7 @@ function SignupForm({ onSignupSuccess }) {
         </div>
 
         <button type="submit" disabled={loading}
-          className="w-full py-3 px-6 bg-[var(--color-green)] text-white rounded-lg font-medium hover:bg-[var(--color-green-dark)] transition-colors disabled:opacity-50">
+          className="w-full py-2 px-4 bg-[var(--color-green)] text-white rounded-lg font-medium hover:bg-[var(--color-green-dark)] transition-colors disabled:opacity-50">
           {loading ? 'Subscribing...' : 'Subscribe'}
         </button>
 

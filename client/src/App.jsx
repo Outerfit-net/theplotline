@@ -29,7 +29,7 @@ function Home() {
   };
 
   return (
-    <main className="max-w-6xl mx-auto px-4 py-12">
+    <main className="max-w-7xl mx-auto px-8 py-12">
       {confirmed && (
         <div className="mb-8 p-4 bg-[var(--color-green)] text-white rounded-lg text-center">
           Your subscription is confirmed! Choose a plan to start receiving letters.
@@ -45,7 +45,7 @@ function Home() {
       )}
 
       {/* Two-column top section: content + sticky form */}
-      <div className="grid md:grid-cols-2 gap-12 mb-16">
+      <div className="grid md:grid-cols-2 gap-20 mb-16">
         {/* Left column: Hero + Author Pills + Characters */}
         <div>
           <section className="mb-12">
@@ -99,7 +99,7 @@ function Home() {
 
         {/* Right column: Sticky signup form */}
         <div className="md:sticky md:top-12 md:self-start">
-          <div className="bg-white rounded-lg border border-[var(--color-cream-dark)] shadow-sm p-8">
+          <div className="bg-white rounded-lg border border-[var(--color-cream-dark)] shadow-sm p-8 ml-4">
             <h3 className="text-2xl text-[var(--color-green-dark)] mb-6">Join the garden</h3>
             <SignupForm onSignupSuccess={(data) => {
               setSubscriberData(data);
