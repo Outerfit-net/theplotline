@@ -186,3 +186,42 @@ CREATE TABLE IF NOT EXISTS author_season_names (
 );
 
 CREATE INDEX IF NOT EXISTS idx_asn_zone_author ON author_season_names(climate_zone_id, author_key);
+
+-- ─── SUBSCRIBERS (EXTENDED FOR STRIPE) ─────────────────────────────────────
+-- Adding columns to existing table in schema if not present
+ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;
+ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS plan TEXT;
+ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT 'active';
+ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS subscription_end_date TEXT;
+ALTER TABLE subscribers ADD COLUMN IF NOT EXISTS referral_code TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_subscribers_stripe_sub ON subscribers(stripe_subscription_id);
+
+-- ─── REFERRALS ────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS referrals (
+    id TEXT PRIMARY KEY,
+    referrer_id TEXT NOT NULL,
+    code TEXT UNIQUE NOT NULL,
+    redeemed_at TEXT,
+    reward_applied_at TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (referrer_id) REFERENCES subscribers(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(code);
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id);
+CREATE INDEX IF NOT EXISTS idx_referrals_redeemed ON referrals(redeemed_at);
+
+-- ─── GIFTS ────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS gifts (
+    id TEXT PRIMARY KEY,
+    gifter_id TEXT NOT NULL,
+    recipient_email TEXT NOT NULL,
+    code TEXT NOT NULL,
+    sent_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (gifter_id) REFERENCES subscribers(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_gifts_gifter ON gifts(gifter_id);
+CREATE INDEX IF NOT EXISTS idx_gifts_code ON gifts(code);
+CREATE INDEX IF NOT EXISTS idx_gifts_sent_at ON gifts(sent_at);

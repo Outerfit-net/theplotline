@@ -15,6 +15,17 @@ function getDb() {
   return new Database(DB_PATH);
 }
 
+// Helper to HTML-escape strings for XSS prevention
+function htmlEscape(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 async function stripeRoutes(fastify) {
   // ── GET /api/subscription/status ──────────────────────────────────────────
   fastify.get('/subscription/status', async (request, reply) => {
@@ -24,8 +35,9 @@ async function stripeRoutes(fastify) {
       return reply.code(400).send({ error: 'Missing required query parameters: email, token' });
     }
 
+    let db;
     try {
-      const db = getDb();
+      db = getDb();
       const stmt = db.prepare(`
         SELECT 
           id, email, plan, subscription_status, subscription_end_date, stripe_subscription_id
@@ -37,11 +49,9 @@ async function stripeRoutes(fastify) {
       const subscriber = stmt.get(email, token);
 
       if (!subscriber) {
-        db.close();
         return reply.code(401).send({ error: 'Invalid email or token' });
       }
 
-      db.close();
       return reply.send({
         email: subscriber.email,
         plan: subscriber.plan,
@@ -51,19 +61,22 @@ async function stripeRoutes(fastify) {
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: 'Failed to fetch subscription status' });
+    } finally {
+      if (db) db.close();
     }
   });
 
   // ── POST /api/subscription/cancel ─────────────────────────────────────────
   fastify.post('/subscription/cancel', async (request, reply) => {
-    const { email, token } = request.query;
+    const { email, token } = request.body;
 
     if (!email || !token) {
-      return reply.code(400).send({ error: 'Missing required query parameters: email, token' });
+      return reply.code(400).send({ error: 'Missing required fields: email, token' });
     }
 
+    let db;
     try {
-      const db = getDb();
+      db = getDb();
       const stmt = db.prepare(`
         SELECT 
           id, email, stripe_subscription_id, subscription_end_date
@@ -75,32 +88,28 @@ async function stripeRoutes(fastify) {
       const subscriber = stmt.get(email, token);
 
       if (!subscriber) {
-        db.close();
         return reply.code(401).send({ error: 'Invalid email or token' });
       }
 
       if (!subscriber.stripe_subscription_id) {
-        db.close();
         return reply.code(400).send({ error: 'No active subscription to cancel' });
       }
 
-      // Cancel Stripe subscription
+      // Cancel Stripe subscription FIRST - only update DB if Stripe succeeds
       try {
         await stripe.subscriptions.cancel(subscriber.stripe_subscription_id);
       } catch (stripeError) {
         fastify.log.error('Stripe cancellation error:', stripeError);
-        // Continue anyway - mark as canceled in DB
+        return reply.code(500).send({ error: 'Failed to cancel subscription with Stripe' });
       }
 
-      // Update subscription status in DB
+      // Update subscription status in DB only after Stripe succeeds
       const updateStmt = db.prepare(`
         UPDATE subscribers 
         SET subscription_status = 'canceled'
         WHERE id = ?
       `);
       updateStmt.run(subscriber.id);
-
-      db.close();
       
       return reply.send({
         success: true,
@@ -110,6 +119,8 @@ async function stripeRoutes(fastify) {
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: 'Failed to cancel subscription' });
+    } finally {
+      if (db) db.close();
     }
   });
 
@@ -121,8 +132,9 @@ async function stripeRoutes(fastify) {
       return reply.code(400).send({ error: 'Missing required query parameters: email, token' });
     }
 
+    let db;
     try {
-      const db = getDb();
+      db = getDb();
       const stmt = db.prepare(`
         SELECT id, email FROM subscribers 
         WHERE email = ? AND unsubscribe_token = ?
@@ -132,7 +144,6 @@ async function stripeRoutes(fastify) {
       const subscriber = stmt.get(email, token);
 
       if (!subscriber) {
-        db.close();
         return reply.code(401).send({ error: 'Invalid email or token' });
       }
 
@@ -153,8 +164,6 @@ async function stripeRoutes(fastify) {
         insertStmt.run(uuidv4(), subscriber.id, code);
       }
 
-      db.close();
-
       return reply.send({
         code,
         url: `https://theplotline.net/?ref=${code}`
@@ -162,6 +171,8 @@ async function stripeRoutes(fastify) {
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: 'Failed to generate referral link' });
+    } finally {
+      if (db) db.close();
     }
   });
 
@@ -177,8 +188,9 @@ async function stripeRoutes(fastify) {
       return reply.code(400).send({ error: 'Invalid plan: must be weekly or monthly' });
     }
 
+    let db;
     try {
-      const db = getDb();
+      db = getDb();
       
       // Verify gifter
       const gifterStmt = db.prepare(`
@@ -190,15 +202,26 @@ async function stripeRoutes(fastify) {
       const gifter = gifterStmt.get(gifterEmail, gifterToken);
 
       if (!gifter) {
-        db.close();
         return reply.code(401).send({ error: 'Invalid gifter email or token' });
+      }
+
+      // Check rate limit: max 5 gifts per day per subscriber
+      const today = new Date().toISOString().split('T')[0];
+      const giftCountStmt = db.prepare(`
+        SELECT COUNT(*) as count FROM gifts
+        WHERE gifter_id = ? AND date(sent_at) = ?
+      `);
+      const giftCount = giftCountStmt.get(gifter.id, today);
+      
+      if (giftCount.count >= 5) {
+        return reply.code(429).send({ error: 'Rate limit exceeded: maximum 5 gifts per day' });
       }
 
       // Create promo code in Stripe (100% off for 1 month)
       const promoCode = `GIFT-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
       
-      // Get the coupon ID from env (z3TAEuwH is the free month coupon)
-      const couponId = 'z3TAEuwH';
+      // Get the coupon ID from env (STRIPE_COUPON_FREE_MONTH)
+      const couponId = process.env.STRIPE_COUPON_FREE_MONTH || 'z3TAEuwH';
       
       try {
         await stripe.promotionCodes.create({
@@ -212,7 +235,6 @@ async function stripeRoutes(fastify) {
         });
       } catch (stripeError) {
         fastify.log.error('Failed to create promo code:', stripeError);
-        db.close();
         return reply.code(500).send({ error: 'Failed to create gift code' });
       }
 
@@ -224,7 +246,7 @@ async function stripeRoutes(fastify) {
       insertGiftStmt.run(uuidv4(), gifter.id, recipientEmail, promoCode);
 
       // Send gift email
-      const gifterName = gifter.email.split('@')[0];
+      const gifterName = htmlEscape(gifter.email.split('@')[0]);
       const signupUrl = `https://theplotline.net/?ref=${promoCode}&email=${encodeURIComponent(recipientEmail)}`;
       
       const giftEmailHtml = `
@@ -287,8 +309,6 @@ If you're not interested, you can ignore this email.
         text: giftEmailText
       });
 
-      db.close();
-
       return reply.send({
         success: true,
         code: promoCode,
@@ -297,12 +317,14 @@ If you're not interested, you can ignore this email.
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: 'Failed to send gift' });
+    } finally {
+      if (db) db.close();
     }
   });
 
   // ── POST /api/stripe/create-checkout ──────────────────────────────────────
   fastify.post('/stripe/create-checkout', async (request, reply) => {
-    const { email, plan, subscriberId, ref } = request.body;
+    const { email, plan, subscriberId } = request.body;
 
     if (!email || !plan) {
       return reply.code(400).send({ error: 'Missing required fields: email, plan' });
@@ -312,8 +334,9 @@ If you're not interested, you can ignore this email.
       return reply.code(400).send({ error: 'Invalid plan: must be weekly or monthly' });
     }
 
+    let db;
     try {
-      const db = getDb();
+      db = getDb();
       
       // Get or create Stripe customer
       let stripeCustomerId;
@@ -341,12 +364,8 @@ If you're not interested, you can ignore this email.
         return reply.code(500).send({ error: `Missing STRIPE_PRICE_${plan.toUpperCase()}` });
       }
 
-      // Store referral code if provided
-      if (ref && subscriberId) {
-        const refStmt = db.prepare('UPDATE subscribers SET referral_code = ? WHERE id = ?');
-        refStmt.run(ref, subscriberId);
-      }
-
+      // Do NOT store referral code here - only set in webhook after payment
+      
       // Create checkout session
       const checkoutSession = await stripe.checkout.sessions.create({
         customer: stripeCustomerId,
@@ -363,15 +382,15 @@ If you're not interested, you can ignore this email.
         metadata: {
           subscriberId: subscriberId || '',
           plan,
-          ref: ref || '',
         },
       });
 
-      db.close();
       return reply.send({ url: checkoutSession.url });
     } catch (error) {
       fastify.log.error(error);
       return reply.code(500).send({ error: 'Failed to create checkout session' });
+    } finally {
+      if (db) db.close();
     }
   });
 
@@ -401,9 +420,11 @@ If you're not interested, you can ignore this email.
       return reply.code(400).send({ error: 'Invalid signature' });
     }
 
-    const db = getDb();
+    let db;
     
     try {
+      db = getDb();
+      
       switch (event.type) {
         // ─── Checkout session completed ───────────────────────────────────
         case 'checkout.session.completed': {
@@ -419,8 +440,7 @@ If you're not interested, you can ignore this email.
                   stripe_subscription_id = ?,
                   plan = ?,
                   subscription_status = ?,
-                  subscription_end_date = ?,
-                  referral_code = ?
+                  subscription_end_date = ?
               WHERE id = ?
             `);
             
@@ -433,24 +453,27 @@ If you're not interested, you can ignore this email.
               plan,
               'active',
               endDate.toISOString().split('T')[0],
-              ref || null,
               subscriberId
             );
 
-            // Handle referral reward if ref was provided
+            // Handle referral reward if ref was provided in checkout metadata
+            // Only apply referral here, not in create-checkout
             if (ref) {
               const refStmt = db.prepare(`
-                SELECT referrer_id, stripe_subscription_id FROM referrals 
-                WHERE code = ? AND redeemed_at IS NULL
+                SELECT r.referrer_id, s.stripe_subscription_id 
+                FROM referrals r 
+                JOIN subscribers s ON r.referrer_id = s.id
+                WHERE r.code = ? AND r.redeemed_at IS NULL
                 LIMIT 1
               `);
               
               const referral = refStmt.get(ref);
               if (referral && referral.stripe_subscription_id) {
                 try {
+                  const couponId = process.env.STRIPE_COUPON_FREE_MONTH || 'z3TAEuwH';
                   // Apply free month coupon to referrer
                   await stripe.subscriptions.update(referral.stripe_subscription_id, {
-                    coupon: 'z3TAEuwH'
+                    coupon: couponId
                   });
 
                   // Mark referral as redeemed
@@ -518,7 +541,7 @@ If you're not interested, you can ignore this email.
       fastify.log.error('Webhook processing error:', error);
       return reply.code(500).send({ error: 'Webhook processing failed' });
     } finally {
-      db.close();
+      if (db) db.close();
     }
   });
 }

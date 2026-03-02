@@ -1,4 +1,4 @@
-import { test, expect } from '@jest/globals';
+import { test, expect, describe, beforeEach, afterEach } from '@jest/globals';
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,11 +11,11 @@ function getTestDb() {
   if (fs.existsSync(TEST_DB)) {
     fs.unlinkSync(TEST_DB);
   }
-  const mainDb = path.join(__dirname, '..', 'data', 'plotlines.db');
-  if (fs.existsSync(mainDb)) {
-    fs.copyFileSync(mainDb, TEST_DB);
-  }
-  return new Database(TEST_DB);
+  const db = new Database(TEST_DB);
+  const schemaPath = path.join(__dirname, '..', 'db', 'schema.sql');
+  const schema = fs.readFileSync(schemaPath, 'utf8');
+  db.exec(schema);
+  return db;
 }
 
 function cleanupTestDb() {

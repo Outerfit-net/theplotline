@@ -45,6 +45,14 @@ export default function Manage() {
     fetchStatus();
   }, [email, token]);
 
+  // Handle hash-based navigation from email links
+  useEffect(() => {
+    const hash = window.location.hash.substring(1); // Remove #
+    if (hash === 'invite' || hash === 'gift' || hash === 'cancel') {
+      setActiveTab(hash);
+    }
+  }, []);
+
   const fetchReferralLink = async () => {
     try {
       const response = await fetch(
@@ -74,10 +82,14 @@ export default function Manage() {
 
     setCanceling(true);
     try {
-      const response = await fetch(
-        `/api/subscription/cancel?email=${encodeURIComponent(email)}&token=${token}`,
-        { method: 'POST' }
-      );
+      const response = await fetch('/api/subscription/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          token,
+        }),
+      });
       if (!response.ok) {
         throw new Error('Failed to cancel subscription');
       }
