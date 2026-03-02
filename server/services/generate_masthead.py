@@ -116,7 +116,7 @@ def generate(station, author, season, weather, output_path=None):
 
     pal      = PALETTES.get(season, PALETTES["spring"]).get(weather, {"bg":(240,245,220),"text":(50,80,40),"accent":(120,160,80)})
     title    = TITLES.get((season, weather), "Plot Lines")
-    subtitle = f"plotlines.com  ·  {season.capitalize()}"
+    subtitle = f"theplotline.net  ·  {season.capitalize()}"
 
     img  = Image.new("RGB", (WIDTH, HEIGHT), pal["bg"])
     draw = ImageDraw.Draw(img)
