@@ -29,10 +29,31 @@ export default function Admin() {
     if (!authed) return;
     setLoading(true);
     fetch('/api/admin/stats', { headers: { 'x-admin-token': token } })
-      .then(r => r.json())
-      .then(d => { setStats(d); setLoading(false); })
-      .catch(() => { setError('Failed to load stats'); setLoading(false); });
-  }, [authed]);
+      .then(r => {
+        if (!r.ok) {
+          if (r.status === 401) {
+            localStorage.removeItem('admin-token');
+            setAuthed(false);
+            setError('Session expired. Please log in again.');
+          } else {
+            setError('Failed to load stats');
+          }
+          return null;
+        }
+        return r.json();
+      })
+      .then(d => {
+        if (d) {
+          setStats(d);
+          setError('');
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        setError('Failed to load stats');
+        setLoading(false);
+      });
+  }, [authed, token]);
 
   if (!authed) return (
     <div className="max-w-sm mx-auto px-4 py-24">
@@ -54,7 +75,7 @@ export default function Admin() {
   );
 
   if (loading) return <div className="text-center py-24 text-[var(--color-text-muted)]">Loading...</div>;
-  if (!stats) return <div className="text-center py-24 text-red-500">{error}</div>;
+  if (error || !stats) return <div className="text-center py-24 text-red-500">{error || 'Failed to load stats'}</div>;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
@@ -114,7 +135,7 @@ export default function Admin() {
             <thead className="bg-[var(--color-cream-dark)]">
               <tr>
                 <th className="text-left px-4 py-2 text-[var(--color-brown-dark)]">Email</th>
-                <th className="text-left px-4 py-2 text-[var(--color-brown-dark)]">Name</th>
+                <th className="text-left px-4 py-2 text-[var(--color-brown-dark)]">Location</th>
                 <th className="text-left px-4 py-2 text-[var(--color-brown-dark)]">Zone</th>
                 <th className="text-left px-4 py-2 text-[var(--color-brown-dark)]">When</th>
               </tr>
@@ -123,7 +144,7 @@ export default function Admin() {
               {stats.recentSubs.map((s, i) => (
                 <tr key={i} className="border-t border-[var(--color-cream-dark)]">
                   <td className="px-4 py-2">{s.email}</td>
-                  <td className="px-4 py-2">{s.name || '—'}</td>
+                  <td className="px-4 py-2">{s.location_city && s.location_country ? `${s.location_city}, ${s.location_country}` : '—'}</td>
                   <td className="px-4 py-2">{s.climate_zone_id || '—'}</td>
                   <td className="px-4 py-2 text-[var(--color-text-muted)]">{s.created_at?.slice(0,10)}</td>
                 </tr>

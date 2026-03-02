@@ -1,7 +1,7 @@
 /**
  * Daily dispatch - generates and sends garden conversations
  *
- * For each unique station+author combination with active subscribers:
+ * For each unique location_key+author combination with active subscribers:
  * 1. Spawn Python engine subprocess to generate prose
  * 2. Store result in daily_runs
  * 3. Email all matching active, confirmed subscribers
@@ -37,10 +37,10 @@ function runEngine(combo) {
   return new Promise((resolve, reject) => {
     const args = [
       ENGINE_PATH,
-      '--station', combo.station_code,
+      '--station', combo.station_code || combo.location_key,
       '--author', combo.author_key,
       '--city', combo.location_city || 'Unknown',
-      '--state', combo.location_state || 'US',
+      '--state', combo.location_state || 'Unknown',
       '--lat', String(combo.lat || 39.7392),
       '--lon', String(combo.lon || -104.9903),
       '--context', combo.garden_context || '',
@@ -99,10 +99,16 @@ async function runDispatch() {
 
   try {
     // Get all combinations that have active, confirmed subscribers
+    // Using location_key+author as the primary key (works for US and international)
     const combinations = db.prepare(`
       SELECT DISTINCT c.*
       FROM combinations c
-      INNER JOIN subscribers s ON s.station_code = c.station_code AND s.author_key = c.author_key
+      INNER JOIN subscribers s ON s.author_key = c.author_key 
+        AND (
+          (s.station_code = c.station_code AND c.station_code IS NOT NULL) OR
+          (ROUND(s.lat * 20) / 20 = ROUND(c.lat * 20) / 20 AND 
+           ROUND(s.lon * 20) / 20 = ROUND(c.lon * 20) / 20)
+        )
       WHERE s.active = 1 AND s.confirmed_at IS NOT NULL
     `).all();
 
@@ -116,11 +122,11 @@ async function runDispatch() {
       `).get(combo.id, today);
 
       if (existingRun && existingRun.status === 'completed') {
-        console.log(`[dispatch] Already completed: ${combo.station_code}/${combo.author_key}`);
+        console.log(`[dispatch] Already completed: ${combo.location_key}/${combo.author_key}`);
         continue;
       }
 
-      console.log(`[dispatch] Processing: ${combo.station_code}/${combo.author_key}`);
+      console.log(`[dispatch] Processing: ${combo.location_key}/${combo.author_key}`);
 
       const startTime = Date.now();
 
@@ -161,15 +167,21 @@ async function runDispatch() {
           );
         }
 
-        console.log(`[dispatch] Generated in ${generationMs}ms: ${combo.station_code}/${combo.author_key}`);
+        console.log(`[dispatch] Generated in ${generationMs}ms: ${combo.location_key}/${combo.author_key}`);
 
         // Get subscribers for this combination
+        // Match by location_key + author (supports both US and international)
         const subscribers = db.prepare(`
           SELECT id, email, unsubscribe_token
           FROM subscribers
-          WHERE station_code = ? AND author_key = ?
+          WHERE author_key = ?
+            AND (
+              (station_code = ? AND station_code IS NOT NULL) OR
+              (ROUND(lat * 20) / 20 = ROUND(?) / 20 AND 
+               ROUND(lon * 20) / 20 = ROUND(?) / 20)
+            )
             AND active = 1 AND confirmed_at IS NOT NULL
-        `).all(combo.station_code, combo.author_key);
+        `).all(combo.author_key, combo.station_code, combo.lat, combo.lon);
 
         console.log(`[dispatch] Sending to ${subscribers.length} subscribers`);
 
@@ -200,7 +212,7 @@ async function runDispatch() {
         }
 
       } catch (engineErr) {
-        console.error(`[dispatch] Engine failed for ${combo.station_code}/${combo.author_key}:`, engineErr.message);
+        console.error(`[dispatch] Engine failed for ${combo.location_key}/${combo.author_key}:`, engineErr.message);
 
         // Record failed run
         if (!existingRun) {
