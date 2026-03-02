@@ -269,7 +269,7 @@ async function adminRoutes(fastify) {
             <p>Use this code at checkout:</p>
             <div class="code-box">${betaCode}</div>
             <p>This gives you one month free. Start your journey:</p>
-            <a href="https://theplotline.net" class="button">Visit The Plot Line</a>
+            <a href="https://theplotline.net/?email=${encodeURIComponent(email)}" class="button">Visit The Plot Line</a>
             <div class="footer">
               <p>Any questions? Reply to this email or reach out to hello@theplotline.net</p>
             </div>

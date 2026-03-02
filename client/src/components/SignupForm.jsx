@@ -15,7 +15,7 @@ const COUNTRIES = [
 ];
 
 function SignupForm({ onSignupSuccess }) {
-  const [email, setEmail]     = useState('');
+  const [email, setEmail]     = useState(() => new URLSearchParams(window.location.search).get('email') || '');
   const [city, setCity]       = useState('');
   const [state, setState]     = useState('');
   const [country, setCountry] = useState('US');
