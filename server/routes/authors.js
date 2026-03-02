@@ -55,7 +55,10 @@ async function authorRoutes(fastify) {
           { key: 'mccarthy', name: 'Cormac McCarthy', description: 'Sparse, biblical cadence' },
           { key: 'oconnor', name: "Flannery O'Connor", description: 'Sharp, unsentimental, darkly comic' },
           { key: 'hurston', name: 'Zora Neale Hurston', description: 'Rich vernacular' },
-          { key: 'saunders', name: 'George Saunders', description: 'Satirical warmth' }
+          { key: 'saunders', name: 'George Saunders', description: 'Satirical warmth' },
+          { key: 'vonnegut', name: 'Kurt Vonnegut', description: 'So it goes' },
+          { key: 'robbins', name: 'Tom Robbins', description: 'Lush, digressive, sensual' },
+          { key: 'gabaldon', name: 'Diana Gabaldon', description: 'Romantic, historically grounded' }
         ]
       });
     }
