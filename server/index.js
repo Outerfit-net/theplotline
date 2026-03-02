@@ -14,6 +14,7 @@ const path = require('path');
 
 const subscriberRoutes = require('./routes/subscribers');
 const authorRoutes = require('./routes/authors');
+const stripeRoutes = require('./routes/stripe');
 const { registerCrons } = require('./cron');
 
 const PORT = process.env.PORT || 3001;
@@ -42,6 +43,7 @@ async function start() {
   fastify.register(subscriberRoutes, { prefix: '/api' });
   fastify.register(authorRoutes, { prefix: '/api' });
   fastify.register(require('./routes/admin'), { prefix: '/api' });
+  fastify.register(stripeRoutes, { prefix: '/api' });
 
   // Register cron jobs
   registerCrons();

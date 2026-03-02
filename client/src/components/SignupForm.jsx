@@ -14,7 +14,7 @@ const COUNTRIES = [
   { code: 'CA', name: 'Canada' },
 ];
 
-function SignupForm() {
+function SignupForm({ onSignupSuccess }) {
   const [email, setEmail]     = useState('');
   const [city, setCity]       = useState('');
   const [state, setState]     = useState('');
@@ -51,7 +51,17 @@ function SignupForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || data.message || 'Subscription failed');
+      
       setMessage(data.message || 'Check your email to confirm!');
+      
+      // Pass subscriber data to parent if callback provided
+      if (onSignupSuccess) {
+        onSignupSuccess({
+          email,
+          id: data.id,
+        });
+      }
+      
       setEmail(''); setCity(''); setState('');
     } catch (err) {
       setError(err.message);

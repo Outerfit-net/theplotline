@@ -1,28 +1,47 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import SignupForm from './components/SignupForm';
+import PlanSelector from './components/PlanSelector';
 import SampleConversation from './components/SampleConversation';
 import About from './pages/About';
 import Background from './pages/Background';
+import Success from './pages/Success';
+import Cancel from './pages/Cancel';
 import Admin from './pages/Admin';
 
 function Home() {
   const [confirmed, setConfirmed] = useState(false);
+  const [showPlanSelector, setShowPlanSelector] = useState(false);
+  const [subscriberData, setSubscriberData] = useState(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('confirmed') === 'true') {
       setConfirmed(true);
+      setShowPlanSelector(true);
       window.history.replaceState({}, '', '/');
     }
   }, []);
+
+  const handlePlanSelectorClose = () => {
+    setShowPlanSelector(false);
+    setConfirmed(false);
+  };
 
   return (
     <main className="max-w-4xl mx-auto px-4 py-12">
       {confirmed && (
         <div className="mb-8 p-4 bg-[var(--color-green)] text-white rounded-lg text-center">
-          Your subscription is confirmed! Watch for your first garden conversation soon.
+          Your subscription is confirmed! Choose a plan to start receiving letters.
         </div>
+      )}
+
+      {showPlanSelector && subscriberData && (
+        <PlanSelector
+          email={subscriberData.email}
+          subscriberId={subscriberData.id}
+          onClose={handlePlanSelectorClose}
+        />
       )}
 
       <section className="text-center mb-16">
@@ -43,7 +62,11 @@ function Home() {
 
       <section className="mb-16">
         <h3 className="text-2xl text-[var(--color-green-dark)] mb-6 text-center">Join the garden</h3>
-        <SignupForm />
+        <SignupForm onSignupSuccess={(data) => {
+          setSubscriberData(data);
+          setConfirmed(true);
+          setShowPlanSelector(true);
+        }} />
       </section>
 
       <section className="mb-16">
@@ -121,6 +144,8 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
           <Route path="/how-it-works" element={<Background />} />
+          <Route path="/success" element={<Success />} />
+          <Route path="/cancel" element={<Cancel />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>
         <Footer />
