@@ -1,6 +1,7 @@
 /**
  * Geocoding service using Nominatim (OpenStreetMap)
  * Supports international locations via country code
+ * Supports US zip codes for more precise location matching
  */
 
 const https = require('https');
@@ -20,23 +21,31 @@ const COUNTRY_CODE_MAP = {
 };
 
 /**
- * Geocode a city to lat/lon
- * @param {string} city
+ * Geocode a city/zipcode to lat/lon
+ * @param {string} query - City name or US zipcode
  * @param {string} countryOrState - ISO2 country code (e.g. 'GB') or US state abbr
  * @returns {Promise<{lat, lon, displayName}|null>}
  */
-async function geocode(city, countryOrState = 'US') {
+async function geocode(query, countryOrState = 'US') {
   const code = (countryOrState || 'US').toUpperCase();
   const nominatimCountry = COUNTRY_CODE_MAP[code];
 
   let url;
-  if (nominatimCountry && code !== 'US') {
+  
+  // Check if query is a US zipcode (5 or 9 digit format)
+  const isZipcode = code === 'US' && /^\d{5}(-\d{4})?$/.test(query);
+  
+  if (isZipcode) {
+    // Use postal code search for US zipcodes
+    const q = encodeURIComponent(query);
+    url = `https://nominatim.openstreetmap.org/search?postalcode=${q}&country=US&format=json&limit=1`;
+  } else if (nominatimCountry && code !== 'US') {
     // International: use countrycodes param for precision
-    const q = encodeURIComponent(city);
+    const q = encodeURIComponent(query);
     url = `https://nominatim.openstreetmap.org/search?city=${q}&format=json&limit=1&countrycodes=${nominatimCountry}`;
   } else {
-    // US: include state in query for disambiguation
-    const q = encodeURIComponent(`${city}, ${countryOrState}, USA`);
+    // US city: include state in query for disambiguation
+    const q = encodeURIComponent(`${query}, ${countryOrState}, USA`);
     url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=us`;
   }
 
@@ -65,10 +74,10 @@ module.exports = { geocode };
 /**
  * Geocode with retry on 429 rate limit
  */
-async function geocodeWithRetry(city, countryOrState, maxRetries = 3) {
+async function geocodeWithRetry(query, countryOrState, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      const result = await geocode(city, countryOrState);
+      const result = await geocode(query, countryOrState);
       if (result) return result;
       // If null result, wait and retry
       await new Promise(r => setTimeout(r, (i + 1) * 1000));

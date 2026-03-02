@@ -40,6 +40,7 @@ async function subscriberRoutes(fastify) {
       email,
       city,
       state,
+      zipcode = '',
       country = 'US',
       author = 'hemingway',
     } = request.body;
@@ -74,9 +75,9 @@ async function subscriberRoutes(fastify) {
           db.prepare(`
             UPDATE subscribers SET active=1, unsubscribed_at=NULL,
               confirm_token=?, unsubscribe_token=?,
-              location_city=?, location_state=?, location_country=?, author_key=?
+              location_city=?, location_state=?, location_country=?, author_key=?, zipcode=?
             WHERE id=?
-          `).run(confirmToken, unsubscribeToken, city, state || '', country, author, existing.id);
+          `).run(confirmToken, unsubscribeToken, city, state || '', country, author, zipcode || '', existing.id);
           await sendConfirmationEmail(email, confirmToken);
           return reply.code(200).send({ message: 'Subscription reactivated. Please check your email to confirm.' });
         }
@@ -87,7 +88,11 @@ async function subscriberRoutes(fastify) {
 
       // ── Resolve location ──────────────────────────────────────────────────
       let lat = null, lon = null, stationCode = null, timezone = null;
-      const locationQuery = state ? `${city}, ${state}` : `${city}, ${country}`;
+      
+      // Prefer zipcode for geocoding if provided
+      const locationQuery = (zipcode && country.toUpperCase() === 'US')
+        ? zipcode
+        : state ? `${city}, ${state}` : `${city}, ${country}`;
 
       try {
         const geo = await geocode(locationQuery, country);
@@ -124,12 +129,12 @@ async function subscriberRoutes(fastify) {
 
       db.prepare(`
         INSERT INTO subscribers (
-          id, email, location_city, location_state, location_country,
+          id, email, location_city, location_state, location_country, zipcode,
           lat, lon, hemisphere, author_key, climate_zone_id, station_code,
           confirm_token, unsubscribe_token
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        id, email, city, state || '', country,
+        id, email, city, state || '', country, zipcode || '',
         lat, lon, hemisphere, author, climateZoneId, stationCode,
         confirmToken, unsubscribeToken
       );

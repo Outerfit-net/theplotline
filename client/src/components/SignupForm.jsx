@@ -18,6 +18,7 @@ function SignupForm({ onSignupSuccess }) {
   const [email, setEmail]     = useState(() => new URLSearchParams(window.location.search).get('email') || '');
   const [city, setCity]       = useState('');
   const [state, setState]     = useState('');
+  const [zipcode, setZipcode] = useState('');
   const [country, setCountry] = useState('US');
   const [author, setAuthor]   = useState('hemingway');
   const [authors, setAuthors] = useState([]);
@@ -43,6 +44,7 @@ function SignupForm({ onSignupSuccess }) {
     try {
       const body = { email, city, country, author };
       if (country === 'US' && state) body.state = state;
+      if (country === 'US' && zipcode) body.zipcode = zipcode;
 
       const res = await fetch(`${API_URL}/subscribe`, {
         method: 'POST',
@@ -62,7 +64,7 @@ function SignupForm({ onSignupSuccess }) {
         });
       }
       
-      setEmail(''); setCity(''); setState('');
+      setEmail(''); setCity(''); setState(''); setZipcode('');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -91,7 +93,7 @@ function SignupForm({ onSignupSuccess }) {
 
         <div className="mb-4">
           <label className="block text-sm font-medium text-[var(--color-text-muted)] mb-1">Country</label>
-          <select value={country} onChange={e => { setCountry(e.target.value); setState(''); }}
+          <select value={country} onChange={e => { setCountry(e.target.value); setState(''); setZipcode(''); }}
             className="w-full px-4 py-2 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none bg-white">
             {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
           </select>
@@ -117,6 +119,16 @@ function SignupForm({ onSignupSuccess }) {
             </div>
           )}
         </div>
+
+        {isUS && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-[var(--color-text-muted)] mb-1">ZIP Code</label>
+            <input type="text" value={zipcode} onChange={e => setZipcode(e.target.value)}
+              className="w-full px-4 py-2 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none"
+              placeholder="Optional" />
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">For more accurate weather forecasts</p>
+          </div>
+        )}
 
         <div className="mb-6">
           <label className="block text-sm font-medium text-[var(--color-text-muted)] mb-1">Writing Style</label>
