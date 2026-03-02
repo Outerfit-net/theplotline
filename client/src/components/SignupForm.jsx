@@ -124,6 +124,12 @@ function SignupForm({ onSignupSuccess }) {
             className="w-full px-4 py-2 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none bg-white">
             {authors.map(a => <option key={a.key} value={a.key}>{a.name}</option>)}
           </select>
+          <a
+            href={`mailto:hello@theplotline.net?subject=Author%20recommendation%20request&body=Hi%2C%20I%27d%20love%20a%20suggestion%20for%20which%20author%20to%20choose.%20My%20email%20is%3A%20${encodeURIComponent(email || '')}%0A%0AWhat%20I%20like%20to%20read%3A%20`}
+            className="mt-1 block text-xs text-[var(--color-green)] hover:underline"
+          >
+            Not sure? Ask us for a recommendation →
+          </a>
         </div>
 
         <button type="submit" disabled={loading}
