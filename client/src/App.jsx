@@ -29,7 +29,7 @@ function Home() {
   };
 
   return (
-    <main className="max-w-4xl mx-auto px-4 py-12">
+    <main className="max-w-6xl mx-auto px-4 py-12">
       {confirmed && (
         <div className="mb-8 p-4 bg-[var(--color-green)] text-white rounded-lg text-center">
           Your subscription is confirmed! Choose a plan to start receiving letters.
@@ -44,66 +44,76 @@ function Home() {
         />
       )}
 
-      <section className="text-center mb-16">
-        <h2 className="text-3xl text-[var(--color-green-dark)] mb-6">
-          Where fictional gardeners gather to share wisdom
-        </h2>
-        <p className="text-lg text-[var(--color-text-muted)] max-w-2xl mx-auto leading-relaxed">
-          Each morning, a cast of twelve garden characters meet to discuss the day's topic.
-          Their conversations — written in the style of literary masters from Hemingway to Morrison —
-          land in your inbox, tuned to your local weather and season.
-        </p>
-      </section>
+      {/* Two-column top section: content + sticky form */}
+      <div className="grid md:grid-cols-2 gap-12 mb-16">
+        {/* Left column: Hero + Author Pills + Characters */}
+        <div>
+          <section className="mb-12">
+            <h2 className="text-3xl text-[var(--color-green-dark)] mb-6">
+              Where fictional gardeners gather to share wisdom
+            </h2>
+            <p className="text-lg text-[var(--color-text-muted)] leading-relaxed">
+              Each morning, a cast of twelve garden characters meet to discuss the day's topic.
+              Their conversations — written in the style of literary masters from Hemingway to Morrison —
+              land in your inbox, tuned to your local weather and season.
+            </p>
+          </section>
 
+          <section className="mb-12">
+            <h3 className="text-2xl text-[var(--color-green-dark)] mb-6">Choose your voice</h3>
+            <p className="text-[var(--color-text-muted)] mb-6">
+              Each conversation is rendered in the style of a literary master:
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {['Hemingway', 'Carver', 'Munro', 'Morrison', 'Oates', 'Lopez',
+                'Strout', 'Bass', 'McCarthy', "O'Connor", 'Hurston', 'Saunders'].map(author => (
+                <span key={author} className="px-3 py-1 bg-[var(--color-cream-dark)] rounded-full text-sm text-[var(--color-brown-dark)]">
+                  {author}
+                </span>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-2xl text-[var(--color-green-dark)] mb-6">Meet the gardeners</h3>
+            <div className="grid grid-cols-1 gap-4">
+              {[
+                { name: 'Buck Thorn', desc: 'Practical and tool-oriented. Fixes things. Not interested in why, just how.' },
+                { name: 'Harry Kvetch', desc: 'Grumpy, specific complaints. Usually right despite himself.' },
+                { name: 'Miss Canthus', desc: 'Poetic, immaculate lawn. Quotes grass names in Latin without apology.' },
+                { name: 'Poppy Seed', desc: 'Enthusiastic about seed trials. Writes in CAPS when excited.' },
+                { name: 'Edie Bell', desc: 'Community feeding is the point. Deep ancestral relationship to soil.' },
+                { name: 'Muso Maple', desc: 'Japanese garden sensibility. Knows all 72 micro-seasons. Often just one sentence.' },
+              ].map(char => (
+                <div key={char.name} className="p-4 bg-white rounded-lg border border-[var(--color-cream-dark)]">
+                  <h4 className="font-semibold text-[var(--color-green)]">{char.name}</h4>
+                  <p className="text-sm text-[var(--color-text-muted)]">{char.desc}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-[var(--color-text-muted)] mt-4 text-sm">
+              Plus six more: Ivy League, Chelsea Flower, Buster Native, Esther Potts, Herb Berryman, and Fern Young.
+            </p>
+          </section>
+        </div>
+
+        {/* Right column: Sticky signup form */}
+        <div className="md:sticky md:top-12 md:self-start">
+          <div className="bg-white rounded-lg border border-[var(--color-cream-dark)] shadow-sm p-8">
+            <h3 className="text-2xl text-[var(--color-green-dark)] mb-6">Join the garden</h3>
+            <SignupForm onSignupSuccess={(data) => {
+              setSubscriberData(data);
+              setConfirmed(true);
+              setShowPlanSelector(true);
+            }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Full-width sample conversation section */}
       <section className="mb-16">
         <h3 className="text-2xl text-[var(--color-green-dark)] mb-6 text-center">A sample conversation</h3>
         <SampleConversation />
-      </section>
-
-      <section className="mb-16">
-        <h3 className="text-2xl text-[var(--color-green-dark)] mb-6 text-center">Join the garden</h3>
-        <SignupForm onSignupSuccess={(data) => {
-          setSubscriberData(data);
-          setConfirmed(true);
-          setShowPlanSelector(true);
-        }} />
-      </section>
-
-      <section className="mb-16">
-        <h3 className="text-2xl text-[var(--color-green-dark)] mb-6 text-center">Meet the gardeners</h3>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[
-            { name: 'Buck Thorn', desc: 'Practical and tool-oriented. Fixes things. Not interested in why, just how.' },
-            { name: 'Harry Kvetch', desc: 'Grumpy, specific complaints. Usually right despite himself.' },
-            { name: 'Miss Canthus', desc: 'Poetic, immaculate lawn. Quotes grass names in Latin without apology.' },
-            { name: 'Poppy Seed', desc: 'Enthusiastic about seed trials. Writes in CAPS when excited.' },
-            { name: 'Edie Bell', desc: 'Community feeding is the point. Deep ancestral relationship to soil.' },
-            { name: 'Muso Maple', desc: 'Japanese garden sensibility. Knows all 72 micro-seasons. Often just one sentence.' },
-          ].map(char => (
-            <div key={char.name} className="p-4 bg-white rounded-lg border border-[var(--color-cream-dark)]">
-              <h4 className="font-semibold text-[var(--color-green)]">{char.name}</h4>
-              <p className="text-sm text-[var(--color-text-muted)]">{char.desc}</p>
-            </div>
-          ))}
-        </div>
-        <p className="text-center text-[var(--color-text-muted)] mt-4">
-          Plus six more: Ivy League, Chelsea Flower, Buster Native, Esther Potts, Herb Berryman, and Fern Young.
-        </p>
-      </section>
-
-      <section className="mb-16">
-        <h3 className="text-2xl text-[var(--color-green-dark)] mb-6 text-center">Choose your voice</h3>
-        <p className="text-center text-[var(--color-text-muted)] mb-6">
-          Each conversation is rendered in the style of a literary master:
-        </p>
-        <div className="flex flex-wrap justify-center gap-3">
-          {['Hemingway', 'Carver', 'Munro', 'Morrison', 'Oates', 'Lopez',
-            'Strout', 'Bass', 'McCarthy', "O'Connor", 'Hurston', 'Saunders'].map(author => (
-            <span key={author} className="px-3 py-1 bg-[var(--color-cream-dark)] rounded-full text-sm text-[var(--color-brown-dark)]">
-              {author}
-            </span>
-          ))}
-        </div>
       </section>
     </main>
   );
