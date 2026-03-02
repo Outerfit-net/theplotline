@@ -1,0 +1,26 @@
+Mit dem Erwerb einer Lizenz für anke-art-Schriften erklären Sie sich mit den folgenden Nutzungsbedingungen einverstanden:
+
+Anzahl der Nutzer
+1.1 Die Lizenz gewährt dem Nutzer die Installation der Schriftdatei auf bis zu 5 Computern. Wenn Sie die Schrift auf mehr als fünf Computern installieren möchten, müssen Sie eine weitere Lizenz erwerben. Die Computer dürfen mit einer beliebigen Anzahl von Druckern und anderen Ausgabegeräten verbunden sein.
+1.2 Netzwerkserver: Die Schriftdatei darf auf einem Netzwerkserver installiert werden, so lange die Anzahl der damit verbundenen Computer nicht fünf übersteigt.
+
+Urheberrecht
+2.1 Urheberrecht. Sie besitzen nicht die Schrift, sondern Sie haben eine Lizenz erworben, diese Schrift zu verwenden. Anke “anke-art” Arnold besitzt und behält sämtliche Rechte an dieser Schrift. Das Urheberrecht ist nicht übertragbar. Die Schrift ist durch internationales Urheberrecht geschützt. Sie dürfen die Schrift nicht weiterverbreiten. Ausnahmen entnehmen Sie den folgenden Abschnitten.
+2.2 Backup. Sie dürfen Backup-Kopien der Schriftdatei erstellen, solange Sie sie nicht weiterverbreiten.
+
+Nutzung
+3.1 Einbettung. Das Einbetten der Schriftdatei (z.B. in PDF-Dateien) ist für die Ansicht und den Druck gestattet, nicht jedoch für das Editieren. Das Einbetten in Macromedia-Flash-Dateien ist gestattet. Jede andere Einbettung ist gestattet, solange dies nicht die Extraktion oder das Kopieren der Schriftdatei ermöglicht.
+3.2 Weitergabe. Sie dürfen die Schriftdatei nicht verleihen, vermieten, verbreiten oder verschenken. Sie dürfen dafür keine Lizenzen verkaufen. Sie dürfen die Lizenz für die Schrift verkaufen, sofern der Käufer mit dieser Nutzungsvereinbarung einverstanden ist und Sie sämtliche Kopien der Schriftdatei dauerhaft vernichten.
+3.3 Veränderungen. Sie dürfen die Schrift verändern, doch die veränderte Datei darf nicht verkauft, zum Download angeboten, verkauft oder auf andere Weise verbreitet werden. Die veränderte Datei darf nur auf solchen Rechnern verwendet werden, die bereits eine Schriftdatei der Ursprungsdatei besitzen. Veränderungen der Schriftdatei beeinflussen nicht das Copyright bzw. das Urheberrecht.
+3.4 Quellenangaben/Impressum. Sie dürfen die Schrift in kommerziellen Werken einsetzen, wenn Sie in der Quellenangabe bzw. im Impressum Anke Arnold als Schriftdesignerin der betreffenden Schrift angeben (sofern dies im entprechenden Werk möglich ist).
+Garantie & Haftung
+
+4.1 Garantie.
+Es kann nicht garantiert werden, dass die Schrift Ihren Ansprüchen gerecht wird, dass etwaige Fehler behoben werden und dass die Schrift auf Ihrem Computer läuft. Jeder Nutzer hat vor dem Kauf der Schriftlizenz die Möglichkeit, eine Demo-Version der Schrift kostenlos zu testen. Schriften von Anke “anke-art” Arnold wurden auf einem Windows XP-System erstellt und getestet.
+4.2 Haftungsausschluss. Anke “anke-art” Arnold gewährt keine Haftung für Schäden, ohne Rücksicht auf deren Art oder Umfang, die durch das Herunterladen oder die sach- oder unsachgemäße Nutzung der Schriftdatei entstehen.
+
+Allgemeines
+5.1 Verstoß. Bei Verstoß gegen den Inhalt dieser Lizenzvereinbarung durch den Nutzer erlischt die Lizenz automatisch. In diesem Fall darf die betreffende Schrift sowie Gestaltungsprodukte, die diese Schrift enthalten, weder benutzt noch veröffentlicht und/oder vertrieben werden. Alle vorhandenen Kopien der Schriftdatei müssen unverzüglich vernichtet werden. Anke “anke-art” Arnold behält sich die Möglichkeit vor, zivil- und strafrechtliche Schritte gegen Lizenzverstöße einzuleiten.
+5.2 Nutzung durch Angestellte und/oder Freelancer. Es liegt in der Verantwortung des Lizenznehmers, Angestellte bzw. Freelancer, die Zugang zu der lizenzierten Schriftart haben, über die Nutzungsbedingungen zu unterrichten und zu gewährleisten, dass diese eingehalten werden.
+
+Die aktuelle Version dieser Nutzungsbedingungen kann unter fontlizenz.anke-art.de nachgelesen werden.

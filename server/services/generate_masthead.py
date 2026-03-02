@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 DATA_DIR      = Path(os.environ.get("DATA_DIR", "/opt/plotlines/data"))
 MASTHEAD_DIR  = DATA_DIR / "mastheads"
-FONT_DIR      = Path(os.environ.get("FONT_DIR", "/opt/plotlines/fonts"))
+FONT_DIR = Path(os.environ.get("FONT_DIR", "/opt/plotlines/fonts/commercial"))
 FALLBACK_FONTS = Path("/usr/share/fonts/truetype/dejavu")
 
 WIDTH, HEIGHT = 600, 100
@@ -85,13 +85,19 @@ PALETTES = {
 
 # When garden fonts land in FONT_DIR, map author → preferred filename here
 AUTHOR_FONTS = {
-    "hemingway": "DejaVuSerif-Bold.ttf",
-    "carver":    "DejaVuSerif.ttf",
-    "morrison":  "DejaVuSerif-Bold.ttf",
-    "mccarthy":  "DejaVuSerif-Bold.ttf",
-    "oconnor":   "DejaVuSerif-Bold.ttf",
-    "hurston":   "DejaVuSerif-Bold.ttf",
-    "default":   "DejaVuSerif.ttf",
+    "hemingway":  "Spectral-Bold.ttf",
+    "carver":     "Lora-Regular.ttf",
+    "munro":      "CormorantGaramond-Italic.ttf",
+    "morrison":   "PlayfairDisplay-Bold.ttf",
+    "oates":      "Lora-Bold.ttf",
+    "lopez":      "IMFellEnglish-Regular.ttf",
+    "strout":     "CormorantGaramond-Regular.ttf",
+    "bass":       "IMFellEnglish-Italic.ttf",
+    "mccarthy":   "Cinzel-Bold.ttf",
+    "oconnor":    "Cinzel-Regular.ttf",
+    "hurston":    "Caveat-Bold.ttf",
+    "saunders":   "Caveat-Regular.ttf",
+    "default":    "Lora-Regular.ttf",
 }
 
 def load_font(author, size):

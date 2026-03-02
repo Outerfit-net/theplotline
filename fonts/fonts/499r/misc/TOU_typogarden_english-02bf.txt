@@ -1,0 +1,25 @@
+By installing and/or purchasing a license for (an) anke-art font(s) you agree to the following legal contract. Please read carefully before installing the font(s). THIS IS A LEGAL CONTRACT.
+
+Number of users
+1.1 Permitted Number of Users. This license allows for the font file(s) to be installed on up to 5 workstations or computers simultaneously. If you wish to install on more than 5 workstations or computers, you must buy another license. The computers may be connected to any number of printers or output devices.
+1.2 Network Servers. The font(s) may also be installed in a network server, as long as the number of workstations connected to the server does not exceed five.
+
+Ownership
+2.1 Ownership. You do not own the font(s), you purchased a license to use them according to the terms of this agreement. Anke Arnold aka anke-art retains all copyrights and trademarks associated with the font(s). The font(s) is/are protected by international copyright law. You may not copy or redistribute the font(s) except as specified below.
+2.2 Backup. Backup copies of the font(s) may be made, as long as they are not distributed.
+
+Usage
+3.1 Embedding. Embedding of the font(s) in documents (e.g. PDF files) is permitted for viewing and printing, but not for editing. Embedding in Macromedia Flash files is permitted. Any other type of embedding which does not allow for the extraction or copying of the font, or the editing of the document, is allowed.
+3.2 Transfer. You may not rent, lease, sublicense, distribute, give away or lend the font(s). You may not include it in software archives. You may permanently transfer or sell the font license if the new license owner agrees with this License Agreement and if you permanently destroy all your copies of the font(s).
+3.3 Modifications. You may modify the font(s) in any way, but the modified font(s) may not be sold, transferred, or otherwise distributed. The newly modified font(s) may only be used in those computers or workstations that already own a license for the original font. Modifications do not affect the copyright.
+3.4 Credit. You may use the font(s) in commercial works of any media type, giving credit to Anke Arnold as the font designer.
+
+Warranties & Liability
+4.1 Disclaimer of Warranties. Anke Arnold aka anke-art does not and cannot warrant that the fonts will meet your requirements, function in an uninterrupted or error-free manner, or that defects will be corrected. Before purchasing the full version of an anke-art font, you have the option to install and test the demo version of the font.
+4.2 Limitation of Liability. Anke Arnold aka anke-art will in no event be liable to you for any direct or indirect damages, including any lost profits or lost savings, that arise out of the use, or inability to use, the font(s).
+
+General
+5.1 Termination. This EULA terminates automatically without notice from Anke Arnold aka anke-art should you fail to comply with any of its provisions. In this case, you have to immediately destroy any copies of the font(s), and commercial works using the font(s) must not be published. Anke Arnold aka anke-art reserves the right to take legal steps in the case of any copyright infringement.
+5.2 Use by Employees and Freelancers. It is your responsibility to inform employees, freelancers and any others who have access to the font(s) at your premises, of the terms and conditions of this EULA, and to ensure that they abide by these terms and conditions.
+
+The actual version of this EULA may be found at eula.anke-art.de
