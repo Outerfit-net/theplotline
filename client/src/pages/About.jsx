@@ -4,6 +4,41 @@ export default function About() {
       <h1 className="text-3xl text-[var(--color-green-dark)] mb-8">About The Plot Line</h1>
 
       <div className="prose text-[var(--color-text-muted)] space-y-6 leading-relaxed">
+
+        <hr className="border-[var(--color-border)] my-8" />
+
+        <h2 className="text-xl text-[var(--color-green-dark)] mb-4">Contact</h2>
+        <p>
+          Questions, feedback, or just want to say hi?{' '}
+          <a href="mailto:support@theplotline.net" className="text-[var(--color-green)] hover:underline">
+            support@theplotline.net
+          </a>
+        </p>
+
+        <hr className="border-[var(--color-border)] my-8" />
+
+        <h2 className="text-xl text-[var(--color-green-dark)] mb-4">Your Data</h2>
+        <p>
+          We store only what we need to deliver your letters: your email, location (city/zip for 
+          weather), and author preference. That's it. No tracking, no advertising, no selling your 
+          data. Ever.
+        </p>
+        <p className="mt-4">
+          <a href="/manage" className="text-[var(--color-green)] hover:underline">
+            Delete my data
+          </a> — remove your email, location, and preferences from our systems. 
+          This cannot be undone.
+        </p>
+
+        <hr className="border-[var(--color-border)] my-8" />
+
+        <h2 className="text-xl text-[var(--color-green-dark)] mb-4">Privacy</h2>
+        <p>
+          We believe privacy isn't a feature — it's the baseline. Your email is used only for 
+          delivering your daily garden letter and account communications. We never share, sell, 
+          or rent your personal information to anyone. Payment processing is handled entirely 
+          by Stripe; we never see or store your credit card details.
+        </p>
         <p>
           The Plot Line started the way most things do — with a problem that wouldn't let go.
         </p>
