@@ -123,7 +123,7 @@ function Nav() {
   return (
     <header className="py-6 px-4 border-b border-[var(--color-cream-dark)]">
       <div className="max-w-4xl mx-auto flex justify-between items-center">
-        <Link to="/" className="text-3xl text-[var(--color-green-dark)] hover:opacity-80">The Plot Line</Link>
+        <Link to="/" className="hover:opacity-90"><img src="/logo.png" alt="The Plot Line" style={{height:"60px", width:"auto"}} /></Link>
         <nav className="flex gap-6 text-sm text-[var(--color-text-muted)]">
           <Link to="/about" className="hover:text-[var(--color-green-dark)]">About</Link>
           <Link to="/how-it-works" className="hover:text-[var(--color-green-dark)]">How it works</Link>

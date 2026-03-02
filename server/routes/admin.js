@@ -265,7 +265,7 @@ async function adminRoutes(fastify) {
         <body>
           <div class="container">
             <img src="https://theplotline.net/logo.png" alt="The Plot Line" style="height:80px;width:auto;display:block;margin:0 auto 24px;" />
-            <h1 style="text-align:center;">You're invited to The Plot Line</h1>
+            <img src="https://theplotline.net/logo.png" alt="The Plot Line" style="height:60px;width:auto;display:block;margin:0 auto 20px;" />
             <p>We'd love to have you join us for a month of free garden conversations.</p>
             <p>Use this code at checkout:</p>
             <div class="code-box">${betaCode}</div>
