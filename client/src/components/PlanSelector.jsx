@@ -22,7 +22,8 @@ function PlanSelector({ email, subscriberId, onClose }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to create checkout');
 
-      // Redirect to Stripe checkout
+      // Dismiss modal then redirect
+      if (onClose) onClose();
       window.location.href = data.url;
     } catch (err) {
       setError(err.message);
@@ -54,7 +55,7 @@ function PlanSelector({ email, subscriberId, onClose }) {
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="font-semibold text-[var(--color-green-dark)]">Weekly</h3>
-                <p className="text-sm text-[var(--color-text-muted)]">One letter per week</p>
+                <p className="text-sm text-[var(--color-text-muted)]">Billed weekly</p>
               </div>
               <div className="text-right">
                 <div className="text-xl font-bold text-[var(--color-green)]">$1.99</div>
@@ -77,7 +78,7 @@ function PlanSelector({ email, subscriberId, onClose }) {
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="font-semibold text-[var(--color-green-dark)]">Monthly</h3>
-                <p className="text-sm text-[var(--color-text-muted)]">Four letters per month</p>
+                <p className="text-sm text-[var(--color-text-muted)]">Billed monthly</p>
               </div>
               <div className="text-right">
                 <div className="text-xl font-bold text-[var(--color-green)]">$3.99</div>

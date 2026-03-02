@@ -188,7 +188,7 @@ function SignupForm({ onSignupSuccess }) {
 
         <button type="submit" disabled={loading || !turnstileToken}
           className="w-full py-2 px-4 bg-[var(--color-green)] text-white rounded-lg font-medium hover:bg-[var(--color-green-dark)] transition-colors disabled:opacity-50">
-          {loading ? 'Subscribing...' : 'Subscribe'}
+          {loading ? 'Subscribing...' : 'Start Reading'}
         </button>
 
         <p className="mt-4 text-xs text-center text-[var(--color-text-muted)]">
