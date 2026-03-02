@@ -1,31 +1,8 @@
-import { test, expect, describe, beforeEach, afterEach } from '@jest/globals';
-import Database from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEST_DB = path.join(__dirname, '..', 'data', 'test-plotlines.db');
+const { test, expect, describe, beforeEach, afterEach } = require('@jest/globals');
+const { initTestDb } = require('./setup');
 
 function getTestDb() {
-  // Use test database
-  if (fs.existsSync(TEST_DB)) {
-    fs.unlinkSync(TEST_DB);
-  }
-  
-  // Create fresh DB with schema
-  const db = new Database(TEST_DB);
-  const schemaPath = path.join(__dirname, '..', 'db', 'schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf8');
-  db.exec(schema);
-  
-  return db;
-}
-
-function cleanupTestDb() {
-  if (fs.existsSync(TEST_DB)) {
-    fs.unlinkSync(TEST_DB);
-  }
+  return initTestDb(':memory:');
 }
 
 describe('Feature 1: Subscription Management', () => {
@@ -37,11 +14,9 @@ describe('Feature 1: Subscription Management', () => {
 
   afterEach(() => {
     if (db) db.close();
-    cleanupTestDb();
   });
 
   test('GET /api/subscription/status - can query subscriber by email and token', () => {
-    // Create a test subscriber
     const stmt = db.prepare(`
       INSERT INTO subscribers (id, email, unsubscribe_token, plan, subscription_status, subscription_end_date, stripe_subscription_id)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -53,7 +28,6 @@ describe('Feature 1: Subscription Management', () => {
     
     stmt.run(testSubId, testEmail, testToken, 'monthly', 'active', '2025-04-01', 'stripe_sub_123');
     
-    // Verify we can query it back
     const checkStmt = db.prepare(`
       SELECT id, email, plan, subscription_status, subscription_end_date 
       FROM subscribers 
@@ -67,7 +41,6 @@ describe('Feature 1: Subscription Management', () => {
   });
 
   test('POST /api/subscription/cancel - can update subscription status to canceled', () => {
-    // Create a test subscriber
     const insertStmt = db.prepare(`
       INSERT INTO subscribers (id, email, unsubscribe_token, plan, subscription_status, subscription_end_date, stripe_subscription_id)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -79,13 +52,11 @@ describe('Feature 1: Subscription Management', () => {
     
     insertStmt.run(testSubId, testEmail, testToken, 'monthly', 'active', '2025-04-01', 'stripe_sub_456');
     
-    // Simulate cancel by updating status
     const updateStmt = db.prepare('UPDATE subscribers SET subscription_status = ? WHERE id = ?');
     const result = updateStmt.run('canceled', testSubId);
     
     expect(result.changes).toBe(1);
     
-    // Verify it was updated
     const checkStmt = db.prepare('SELECT subscription_status FROM subscribers WHERE id = ?');
     const updated = checkStmt.get(testSubId);
     expect(updated.subscription_status).toBe('canceled');
@@ -109,7 +80,6 @@ describe('Feature 1: Subscription Management', () => {
     const result = stmt.run(refId, referrerId, code);
     expect(result.changes).toBe(1);
     
-    // Query it back
     const checkStmt = db.prepare('SELECT * FROM referrals WHERE id = ?');
     const row = checkStmt.get(refId);
     expect(row).toBeDefined();
@@ -134,7 +104,6 @@ describe('Feature 1: Subscription Management', () => {
     const result = stmt.run(giftId, gifterId, 'recipient@example.com', code);
     expect(result.changes).toBe(1);
     
-    // Query it back
     const checkStmt = db.prepare('SELECT * FROM gifts WHERE id = ?');
     const row = checkStmt.get(giftId);
     expect(row).toBeDefined();

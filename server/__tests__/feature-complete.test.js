@@ -1,27 +1,8 @@
-import { test, expect, describe, beforeEach, afterEach } from '@jest/globals';
-import Database from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEST_DB = path.join(__dirname, '..', 'data', 'test-plotlines.db');
+const { test, expect, describe, beforeEach, afterEach } = require('@jest/globals');
+const { initTestDb } = require('./setup');
 
 function getTestDb() {
-  if (fs.existsSync(TEST_DB)) {
-    fs.unlinkSync(TEST_DB);
-  }
-  const db = new Database(TEST_DB);
-  const schemaPath = path.join(__dirname, '..', 'db', 'schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf8');
-  db.exec(schema);
-  return db;
-}
-
-function cleanupTestDb() {
-  if (fs.existsSync(TEST_DB)) {
-    fs.unlinkSync(TEST_DB);
-  }
+  return initTestDb(':memory:');
 }
 
 describe('Complete Feature Implementation', () => {
@@ -33,7 +14,6 @@ describe('Complete Feature Implementation', () => {
 
   afterEach(() => {
     if (db) db.close();
-    cleanupTestDb();
   });
 
   describe('Feature 1: Cancel Subscription', () => {

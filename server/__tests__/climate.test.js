@@ -1,10 +1,5 @@
-import { test, expect, describe } from '@jest/globals';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const climateModule = await import('../services/climate.js');
-const { assignClimateZone, getHemisphere, getDayOfYear, getGenericSeason } = climateModule;
+const { test, expect, describe } = require('@jest/globals');
+const { assignClimateZone, getHemisphere, getDayOfYear, getGenericSeason } = require('../services/climate');
 
 describe('Climate Zone Assignment', () => {
   test('Boulder CO → high_plains', () => expect(assignClimateZone(40.01, -105.27, 'US')).toBe('high_plains'));

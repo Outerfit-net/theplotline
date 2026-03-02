@@ -1,31 +1,14 @@
-import { test, expect, describe, beforeEach, afterEach } from '@jest/globals';
-import Database from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEST_DB = path.join(__dirname, '..', 'data', 'test-plotlines.db');
+const { test, expect, describe } = require('@jest/globals');
+const { initTestDb } = require('./setup');
 
 function getTestDb() {
-  if (fs.existsSync(TEST_DB)) {
-    fs.unlinkSync(TEST_DB);
-  }
-  const db = new Database(TEST_DB);
-  
-  // Apply schema
-  const schemaPath = path.join(__dirname, '..', 'db', 'schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf8');
-  db.exec(schema);
-  
-  return db;
+  return initTestDb(':memory:');
 }
 
 describe('Admin Routes', () => {
   test('requires ADMIN_SECRET environment variable', () => {
     delete process.env.ADMIN_SECRET;
     
-    // Just test that calling without secret throws
     expect(() => {
       if (!process.env.ADMIN_SECRET) {
         throw new Error('ADMIN_SECRET is required');
@@ -39,7 +22,6 @@ describe('Admin Routes', () => {
     const secret = process.env.ADMIN_SECRET;
     expect(secret).toBe('test-secret-123');
     
-    // Simulate password check
     const password = 'test-secret-123';
     expect(password === secret).toBe(true);
   });
@@ -58,7 +40,6 @@ describe('International Subscriber Dispatch', () => {
   test('subscribers with NULL station_code are matched by lat/lon grid', () => {
     const db = getTestDb();
     
-    // Insert international subscriber (no station_code)
     const subId = 'sub-intl-001';
     db.prepare(`
       INSERT INTO subscribers (
@@ -67,7 +48,6 @@ describe('International Subscriber Dispatch', () => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
     `).run(subId, 'intl@example.com', 'Tokyo', 'JP', 35.6762, 139.6503, 'hemingway');
     
-    // Insert combination with same location
     const comboId = 'combo-intl-001';
     db.prepare(`
       INSERT INTO combinations (
@@ -76,7 +56,6 @@ describe('International Subscriber Dispatch', () => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(comboId, '35.68:139.65', 'hemingway', 'Tokyo', 'JP', 35.6762, 139.6503, 'N', null);
     
-    // Test: get combinations for subscribers with confirmed status
     const subs = db.prepare(`
       SELECT DISTINCT s.id, s.email
       FROM subscribers s
