@@ -122,8 +122,8 @@ function Home() {
 function Nav() {
   return (
     <header className="py-6 px-4 border-b border-[var(--color-cream-dark)]">
-      <div className="flex items-center justify-between">
-        <Link to="/" className="hover:opacity-90 pl-6"><img src="/logo-v4.png" alt="The Plot Line" style={{height:"110px", width:"auto"}} /></Link>
+      <div className="max-w-7xl mx-auto w-full flex items-center justify-between px-8">
+        <Link to="/" className="hover:opacity-90"><img src="/logo-v4.png" alt="The Plot Line" style={{height:"110px", width:"auto"}} /></Link>
         <nav className="flex gap-6 text-sm text-[var(--color-text-muted)]">
           <Link to="/about" className="hover:text-[var(--color-green-dark)]">About</Link>
           <Link to="/how-it-works" className="hover:text-[var(--color-green-dark)]">How it works</Link>
