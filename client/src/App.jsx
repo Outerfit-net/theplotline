@@ -129,7 +129,7 @@ function Nav() {
           <Link to="/how-it-works" className="hover:text-[var(--color-green-dark)]">How it works</Link>
         </nav>
       </div>
-      <p className="text-center text-[var(--color-text-muted)] text-sm mt-2">
+      <p className="text-left text-[var(--color-text-muted)] text-base mt-1 px-8">
         Daily garden conversations, delivered to your inbox
       </p>
     </header>
