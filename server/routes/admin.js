@@ -21,6 +21,15 @@ function getAdminSecret() {
   return secret;
 }
 
+// Get STRIPE_BETA_COUPON_ID from env
+function getStripeBetaCouponId() {
+  const couponId = process.env.STRIPE_BETA_COUPON_ID;
+  if (!couponId) {
+    throw new Error('STRIPE_BETA_COUPON_ID environment variable is required');
+  }
+  return couponId;
+}
+
 /**
  * Generate a secure session token
  */
@@ -56,18 +65,67 @@ function validateSessionToken(token) {
 }
 
 /**
- * Generate a random 5-character alphanumeric code for beta coupon
+ * Generate a random beta code using secure crypto.randomBytes
+ * Format: BETA-XXXXXXXX (8 hex chars uppercase)
  */
 function generateBetaCode() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = '';
-  for (let i = 0; i < 5; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  return `BETA-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+}
+
+/**
+ * Check if beta code already exists in database
+ */
+function betaCodeExists(db, code) {
+  const result = db.prepare('SELECT 1 FROM beta_invites WHERE code = ? LIMIT 1').get(code);
+  return !!result;
+}
+
+/**
+ * Check if email already has an active invite
+ */
+function getExistingInvite(db, email) {
+  return db.prepare(`
+    SELECT id, email, code, status, created_at
+    FROM beta_invites
+    WHERE email = ? AND status IN ('pending', 'sent')
+    LIMIT 1
+  `).get(email);
+}
+
+/**
+ * Generate unique beta code with collision retry (max 3 attempts)
+ */
+function generateUniqueBetaCode(db, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    const code = generateBetaCode();
+    if (!betaCodeExists(db, code)) {
+      return code;
+    }
   }
-  return `BETA-${code}`;
+  throw new Error('Failed to generate unique beta code after 3 retries');
 }
 
 async function adminRoutes(fastify) {
+
+  // Initialize beta_invites table if it doesn't exist
+  try {
+    const db = fastify.db;
+    if (db) {
+      db.prepare(`
+        CREATE TABLE IF NOT EXISTS beta_invites (
+          id TEXT PRIMARY KEY,
+          email TEXT NOT NULL,
+          code TEXT NOT NULL UNIQUE,
+          status TEXT DEFAULT 'pending',
+          created_at TEXT DEFAULT (datetime('now')),
+          sent_at TEXT,
+          failed_at TEXT
+        )
+      `).run();
+    }
+  } catch (err) {
+    fastify.log.error('Failed to initialize beta_invites table:', err);
+  }
 
   // Auth check
   fastify.post('/admin/login', async (req, reply) => {
@@ -142,7 +200,7 @@ async function adminRoutes(fastify) {
       return { error: 'Unauthorized' };
     }
 
-    const { email } = req.body || {};
+    const { email, force } = req.body || {};
     if (!email || !email.includes('@')) {
       reply.code(400);
       return { error: 'Invalid email address' };
@@ -154,19 +212,42 @@ async function adminRoutes(fastify) {
       return { error: 'Database connection not available' };
     }
 
+    let inviteId = uuidv4();
+    
     try {
-      // Generate unique beta code
-      const betaCode = generateBetaCode();
+      // Check for existing active invite (unless force override)
+      const existing = getExistingInvite(db, email);
+      if (existing && !force) {
+        reply.code(409);
+        return {
+          error: 'Invite already exists for this email',
+          existingCode: existing.code,
+          existingStatus: existing.status,
+          warning: 'Use { force: true } to override'
+        };
+      }
 
-      // Create Stripe promo code using the beta coupon z3TAEuwH
+      // Generate unique beta code (retry up to 3 times)
+      const betaCode = generateUniqueBetaCode(db);
+
+      // Step 1: Insert DB row with status='pending' FIRST (before Stripe creation)
+      db.prepare(`
+        INSERT INTO beta_invites (id, email, code, status, created_at)
+        VALUES (?, ?, ?, 'pending', datetime('now'))
+      `).run(inviteId, email, betaCode);
+
+      fastify.log.info(`[BETA] DB record created (pending) for ${email} with code ${betaCode}`);
+
+      // Step 2: Create Stripe promo code
+      const couponId = getStripeBetaCouponId();
       const promoCode = await stripe.promotionCodes.create({
-        coupon: 'z3TAEuwH',
+        coupon: couponId,
         code: betaCode,
       });
 
       fastify.log.info(`[BETA] Created Stripe promo code ${betaCode} for ${email}`);
 
-      // Send invite email
+      // Step 3: Send invite email
       const html = `
         <!DOCTYPE html>
         <html>
@@ -217,18 +298,32 @@ Any questions? Reply to this email or reach out to hello@theplotline.net`;
 
       fastify.log.info(`[BETA] Sent invite email to ${email}`);
 
-      // Log to database
-      const id = uuidv4();
+      // Step 4: Update DB status to 'sent'
       db.prepare(`
-        INSERT INTO beta_invites (id, email, code, sent_at)
-        VALUES (?, ?, ?, datetime('now'))
-      `).run(id, email, betaCode);
+        UPDATE beta_invites
+        SET status = 'sent', sent_at = datetime('now')
+        WHERE id = ?
+      `).run(inviteId);
 
-      return { success: true, code: betaCode, email };
+      return { success: true, code: betaCode, email, status: 'sent' };
+
     } catch (err) {
       fastify.log.error('Beta invite error:', err);
+      
+      // If DB record was created, mark as failed
+      try {
+        db.prepare(`
+          UPDATE beta_invites
+          SET status = 'failed', failed_at = datetime('now')
+          WHERE id = ?
+        `).run(inviteId);
+      } catch (updateErr) {
+        fastify.log.error('Failed to update beta invite status to failed:', updateErr);
+      }
+
       reply.code(500);
-      return { error: 'Failed to send beta invite: ' + err.message };
+      // Return generic error message to client, keep full error server-side only
+      return { error: 'Failed to send beta invite' };
     }
   });
 
@@ -249,9 +344,9 @@ Any questions? Reply to this email or reach out to hello@theplotline.net`;
 
     try {
       const invites = db.prepare(`
-        SELECT email, code, sent_at
+        SELECT email, code, status, created_at, sent_at, failed_at
         FROM beta_invites
-        ORDER BY sent_at DESC
+        ORDER BY created_at DESC
       `).all();
 
       return { invites };
