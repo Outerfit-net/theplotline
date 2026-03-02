@@ -8,6 +8,7 @@ import Background from './pages/Background';
 import Success from './pages/Success';
 import Cancel from './pages/Cancel';
 import Admin from './pages/Admin';
+import Manage from './pages/Manage';
 
 function Home() {
   const [confirmed, setConfirmed] = useState(false);
@@ -157,6 +158,7 @@ function App() {
           <Route path="/success" element={<Success />} />
           <Route path="/cancel" element={<Cancel />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/manage" element={<Manage />} />
         </Routes>
         <Footer />
       </div>

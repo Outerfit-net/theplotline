@@ -1,10 +1,13 @@
 /**
- * Stripe routes — checkout and webhook handling
+ * Stripe routes — checkout and webhook handling, plus referral and gift endpoints
  */
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Database = require('better-sqlite3');
 const path = require('path');
+const crypto = require('crypto');
+const { v4: uuidv4 } = require('uuid');
+const { sendEmail } = require('../services/email');
 
 const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', '..', 'data', 'plotlines.db');
 
@@ -13,9 +16,293 @@ function getDb() {
 }
 
 async function stripeRoutes(fastify) {
+  // ── GET /api/subscription/status ──────────────────────────────────────────
+  fastify.get('/subscription/status', async (request, reply) => {
+    const { email, token } = request.query;
+
+    if (!email || !token) {
+      return reply.code(400).send({ error: 'Missing required query parameters: email, token' });
+    }
+
+    try {
+      const db = getDb();
+      const stmt = db.prepare(`
+        SELECT 
+          id, email, plan, subscription_status, subscription_end_date, stripe_subscription_id
+        FROM subscribers 
+        WHERE email = ? AND unsubscribe_token = ?
+        LIMIT 1
+      `);
+      
+      const subscriber = stmt.get(email, token);
+
+      if (!subscriber) {
+        db.close();
+        return reply.code(401).send({ error: 'Invalid email or token' });
+      }
+
+      db.close();
+      return reply.send({
+        email: subscriber.email,
+        plan: subscriber.plan,
+        status: subscriber.subscription_status,
+        subscription_end_date: subscriber.subscription_end_date
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to fetch subscription status' });
+    }
+  });
+
+  // ── POST /api/subscription/cancel ─────────────────────────────────────────
+  fastify.post('/subscription/cancel', async (request, reply) => {
+    const { email, token } = request.query;
+
+    if (!email || !token) {
+      return reply.code(400).send({ error: 'Missing required query parameters: email, token' });
+    }
+
+    try {
+      const db = getDb();
+      const stmt = db.prepare(`
+        SELECT 
+          id, email, stripe_subscription_id, subscription_end_date
+        FROM subscribers 
+        WHERE email = ? AND unsubscribe_token = ?
+        LIMIT 1
+      `);
+      
+      const subscriber = stmt.get(email, token);
+
+      if (!subscriber) {
+        db.close();
+        return reply.code(401).send({ error: 'Invalid email or token' });
+      }
+
+      if (!subscriber.stripe_subscription_id) {
+        db.close();
+        return reply.code(400).send({ error: 'No active subscription to cancel' });
+      }
+
+      // Cancel Stripe subscription
+      try {
+        await stripe.subscriptions.cancel(subscriber.stripe_subscription_id);
+      } catch (stripeError) {
+        fastify.log.error('Stripe cancellation error:', stripeError);
+        // Continue anyway - mark as canceled in DB
+      }
+
+      // Update subscription status in DB
+      const updateStmt = db.prepare(`
+        UPDATE subscribers 
+        SET subscription_status = 'canceled'
+        WHERE id = ?
+      `);
+      updateStmt.run(subscriber.id);
+
+      db.close();
+      
+      return reply.send({
+        success: true,
+        message: 'Subscription canceled',
+        access_continues_until: subscriber.subscription_end_date
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to cancel subscription' });
+    }
+  });
+
+  // ── GET /api/referral/link ───────────────────────────────────────────────
+  fastify.get('/referral/link', async (request, reply) => {
+    const { email, token } = request.query;
+
+    if (!email || !token) {
+      return reply.code(400).send({ error: 'Missing required query parameters: email, token' });
+    }
+
+    try {
+      const db = getDb();
+      const stmt = db.prepare(`
+        SELECT id, email FROM subscribers 
+        WHERE email = ? AND unsubscribe_token = ?
+        LIMIT 1
+      `);
+      
+      const subscriber = stmt.get(email, token);
+
+      if (!subscriber) {
+        db.close();
+        return reply.code(401).send({ error: 'Invalid email or token' });
+      }
+
+      // Check if referral code already exists
+      const referralStmt = db.prepare('SELECT code FROM referrals WHERE referrer_id = ?');
+      let referralRow = referralStmt.get(subscriber.id);
+
+      let code;
+      if (referralRow) {
+        code = referralRow.code;
+      } else {
+        // Generate new referral code
+        code = 'REF-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+        const insertStmt = db.prepare(`
+          INSERT INTO referrals (id, referrer_id, code, created_at)
+          VALUES (?, ?, ?, datetime('now'))
+        `);
+        insertStmt.run(uuidv4(), subscriber.id, code);
+      }
+
+      db.close();
+
+      return reply.send({
+        code,
+        url: `https://theplotline.net/?ref=${code}`
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to generate referral link' });
+    }
+  });
+
+  // ── POST /api/gift ───────────────────────────────────────────────────────
+  fastify.post('/gift', async (request, reply) => {
+    const { gifterEmail, gifterToken, recipientEmail, plan } = request.body;
+
+    if (!gifterEmail || !gifterToken || !recipientEmail || !plan) {
+      return reply.code(400).send({ error: 'Missing required fields: gifterEmail, gifterToken, recipientEmail, plan' });
+    }
+
+    if (!['weekly', 'monthly'].includes(plan)) {
+      return reply.code(400).send({ error: 'Invalid plan: must be weekly or monthly' });
+    }
+
+    try {
+      const db = getDb();
+      
+      // Verify gifter
+      const gifterStmt = db.prepare(`
+        SELECT id, email FROM subscribers 
+        WHERE email = ? AND unsubscribe_token = ?
+        LIMIT 1
+      `);
+      
+      const gifter = gifterStmt.get(gifterEmail, gifterToken);
+
+      if (!gifter) {
+        db.close();
+        return reply.code(401).send({ error: 'Invalid gifter email or token' });
+      }
+
+      // Create promo code in Stripe (100% off for 1 month)
+      const promoCode = `GIFT-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+      
+      // Get the coupon ID from env (z3TAEuwH is the free month coupon)
+      const couponId = 'z3TAEuwH';
+      
+      try {
+        await stripe.promotionCodes.create({
+          coupon: couponId,
+          code: promoCode,
+          max_redemptions: 1,
+          metadata: {
+            gift: 'true',
+            gifter: gifterEmail
+          }
+        });
+      } catch (stripeError) {
+        fastify.log.error('Failed to create promo code:', stripeError);
+        db.close();
+        return reply.code(500).send({ error: 'Failed to create gift code' });
+      }
+
+      // Log gift to database
+      const insertGiftStmt = db.prepare(`
+        INSERT INTO gifts (id, gifter_id, recipient_email, code, sent_at)
+        VALUES (?, ?, ?, ?, datetime('now'))
+      `);
+      insertGiftStmt.run(uuidv4(), gifter.id, recipientEmail, promoCode);
+
+      // Send gift email
+      const gifterName = gifter.email.split('@')[0];
+      const signupUrl = `https://theplotline.net/?ref=${promoCode}&email=${encodeURIComponent(recipientEmail)}`;
+      
+      const giftEmailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Georgia, serif; background: #faf8f5; padding: 40px; }
+            .container { max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; }
+            h1 { color: #2d4a3e; font-size: 24px; margin-bottom: 16px; }
+            p { color: #4a4a4a; line-height: 1.6; }
+            .code-box { background: #f5f3f0; border: 2px solid #4a7c59; padding: 20px; text-align: center; margin: 24px 0; border-radius: 4px; }
+            .code { font-size: 20px; font-weight: bold; color: #4a7c59; font-family: monospace; letter-spacing: 2px; }
+            .button { display: inline-block; background: #4a7c59; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 20px 0; }
+            .footer { margin-top: 40px; font-size: 12px; color: #888; border-top: 1px solid #e8e4df; padding-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <img src="https://theplotline.net/logo-v4.png" alt="The Plot Line" style="height:70px;width:auto;display:block;margin:0 auto 20px;" />
+            <h1>${gifterName} sent you a garden letter 🌱</h1>
+            <p>A friend thinks you'd love to receive daily garden conversations delivered to your inbox.</p>
+            <p>The Plot Line brings together a cast of fictional gardeners — each with a distinct personality and voice — to discuss the day's topic in the literary style of masters like Hemingway, Morrison, and others. Their conversations are tuned to your local weather and season.</p>
+            <p>Here's your gift code:</p>
+            <div class="code-box">
+              <div class="code">${promoCode}</div>
+              <p style="margin: 12px 0 0 0; font-size: 12px; color: #888;">100% off your first month</p>
+            </div>
+            <p><a href="${signupUrl}" class="button">Claim Your Gift</a></p>
+            <p style="font-size: 12px; color: #888;">Or use code <strong>${promoCode}</strong> during checkout at theplotline.net</p>
+            <div class="footer">
+              <p>If you're not interested, you can ignore this email. No hard feelings!</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const giftEmailText = `
+${gifterName} sent you a garden letter 🌱
+
+A friend thinks you'd love to receive daily garden conversations delivered to your inbox.
+
+The Plot Line brings together a cast of fictional gardeners to discuss the day's topic in the literary style of masters like Hemingway, Morrison, and others.
+
+Your gift code: ${promoCode}
+(100% off your first month)
+
+Claim your gift: ${signupUrl}
+
+Or use code ${promoCode} during checkout at theplotline.net
+
+If you're not interested, you can ignore this email.
+      `;
+
+      await sendEmail({
+        to: recipientEmail,
+        subject: `${gifterName} sent you a garden letter 🌱`,
+        html: giftEmailHtml,
+        text: giftEmailText
+      });
+
+      db.close();
+
+      return reply.send({
+        success: true,
+        code: promoCode,
+        message: `Gift sent to ${recipientEmail}`
+      });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to send gift' });
+    }
+  });
+
   // ── POST /api/stripe/create-checkout ──────────────────────────────────────
   fastify.post('/stripe/create-checkout', async (request, reply) => {
-    const { email, plan, subscriberId } = request.body;
+    const { email, plan, subscriberId, ref } = request.body;
 
     if (!email || !plan) {
       return reply.code(400).send({ error: 'Missing required fields: email, plan' });
@@ -54,6 +341,12 @@ async function stripeRoutes(fastify) {
         return reply.code(500).send({ error: `Missing STRIPE_PRICE_${plan.toUpperCase()}` });
       }
 
+      // Store referral code if provided
+      if (ref && subscriberId) {
+        const refStmt = db.prepare('UPDATE subscribers SET referral_code = ? WHERE id = ?');
+        refStmt.run(ref, subscriberId);
+      }
+
       // Create checkout session
       const checkoutSession = await stripe.checkout.sessions.create({
         customer: stripeCustomerId,
@@ -70,6 +363,7 @@ async function stripeRoutes(fastify) {
         metadata: {
           subscriberId: subscriberId || '',
           plan,
+          ref: ref || '',
         },
       });
 
@@ -116,6 +410,7 @@ async function stripeRoutes(fastify) {
           const session = event.data.object;
           const subscriberId = session.metadata?.subscriberId;
           const plan = session.metadata?.plan;
+          const ref = session.metadata?.ref;
 
           if (subscriberId) {
             const stmt = db.prepare(`
@@ -124,7 +419,8 @@ async function stripeRoutes(fastify) {
                   stripe_subscription_id = ?,
                   plan = ?,
                   subscription_status = ?,
-                  subscription_end_date = ?
+                  subscription_end_date = ?,
+                  referral_code = ?
               WHERE id = ?
             `);
             
@@ -137,8 +433,38 @@ async function stripeRoutes(fastify) {
               plan,
               'active',
               endDate.toISOString().split('T')[0],
+              ref || null,
               subscriberId
             );
+
+            // Handle referral reward if ref was provided
+            if (ref) {
+              const refStmt = db.prepare(`
+                SELECT referrer_id, stripe_subscription_id FROM referrals 
+                WHERE code = ? AND redeemed_at IS NULL
+                LIMIT 1
+              `);
+              
+              const referral = refStmt.get(ref);
+              if (referral && referral.stripe_subscription_id) {
+                try {
+                  // Apply free month coupon to referrer
+                  await stripe.subscriptions.update(referral.stripe_subscription_id, {
+                    coupon: 'z3TAEuwH'
+                  });
+
+                  // Mark referral as redeemed
+                  const updateRefStmt = db.prepare(`
+                    UPDATE referrals 
+                    SET redeemed_at = datetime('now'), reward_applied_at = datetime('now')
+                    WHERE code = ?
+                  `);
+                  updateRefStmt.run(ref);
+                } catch (stripeError) {
+                  fastify.log.error('Failed to apply referral reward:', stripeError);
+                }
+              }
+            }
           }
           break;
         }

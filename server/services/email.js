@@ -97,7 +97,10 @@ If you didn't sign up for The Plot Line, you can ignore this email.
  * @param {string} unsubscribeToken
  */
 async function sendDailyEmail(email, dailyRun, unsubscribeToken) {
-  const unsubscribeUrl = `${BASE_URL}/api/unsubscribe?token=${unsubscribeToken}`;
+  const unsubscribeUrl = `https://theplotline.net/manage?email=${encodeURIComponent(email)}&token=${unsubscribeToken}`;
+  const manageUrl = `https://theplotline.net/manage?email=${encodeURIComponent(email)}&token=${unsubscribeToken}`;
+  const inviteUrl = `https://theplotline.net/manage?email=${encodeURIComponent(email)}&token=${unsubscribeToken}#invite`;
+  const giftUrl = `https://theplotline.net/manage?email=${encodeURIComponent(email)}&token=${unsubscribeToken}#gift`;
 
   const html = `
     <!DOCTYPE html>
@@ -113,8 +116,9 @@ async function sendDailyEmail(email, dailyRun, unsubscribeToken) {
         .prose p { margin-bottom: 16px; }
         .quote { border-left: 3px solid #4a7c59; padding-left: 16px; color: #666; font-style: italic; margin: 24px 0; }
         .weather { background: #f5f3f0; padding: 12px; border-radius: 4px; font-size: 14px; color: #666; margin-bottom: 24px; }
-        .footer { margin-top: 40px; font-size: 12px; color: #888; text-align: center; }
-        .footer a { color: #4a7c59; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e8e4df; font-size: 12px; color: #888; text-align: center; }
+        .footer a { color: #4a7c59; text-decoration: none; margin: 0 4px; }
+        .footer a:hover { text-decoration: underline; }
       </style>
     </head>
     <body>
@@ -130,7 +134,12 @@ async function sendDailyEmail(email, dailyRun, unsubscribeToken) {
         <div class="quote">${dailyRun.quote || ''}</div>
         <div class="footer">
           <p>Characters: ${dailyRun.characters || 'The usual suspects'}</p>
-          <p><a href="${unsubscribeUrl}">Unsubscribe</a> from The Plot Line</p>
+          <p>
+            <a href="${manageUrl}">Manage subscription</a> · 
+            <a href="${inviteUrl}">Invite a friend</a> · 
+            <a href="${giftUrl}">Gift a subscription</a> · 
+            <a href="${unsubscribeUrl}#cancel">Cancel</a>
+          </p>
         </div>
       </div>
     </body>
@@ -152,7 +161,11 @@ ${dailyRun.prose_text || 'The garden waits.'}
 
 Characters: ${dailyRun.characters || 'The usual suspects'}
 
-Unsubscribe: ${unsubscribeUrl}
+---
+Manage subscription: ${manageUrl}
+Invite a friend: ${inviteUrl}
+Gift a subscription: ${giftUrl}
+Cancel: ${unsubscribeUrl}#cancel
   `;
 
   return sendEmail({
