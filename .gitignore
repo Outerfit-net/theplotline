@@ -16,8 +16,7 @@ data/
 
 # Environment — plaintext never committed, encrypted .enc files are safe
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.enc
 
 # Logs

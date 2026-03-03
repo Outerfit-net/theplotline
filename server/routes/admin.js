@@ -17,16 +17,30 @@ const loginAttempts = new Map();
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const RATE_LIMIT_MAX_ATTEMPTS = 5; // 5 attempts per window
 
+// Cleanup stale loginAttempts entries every 30 minutes
+setInterval(() => {
+  const now = Date.now();
+  const oneHourAgo = now - 60 * 60 * 1000;
+  for (const [ip, attempts] of loginAttempts.entries()) {
+    const recent = attempts.filter(t => t > oneHourAgo);
+    if (recent.length === 0) {
+      loginAttempts.delete(ip);
+    } else {
+      loginAttempts.set(ip, recent);
+    }
+  }
+}, 30 * 60 * 1000);
+
 function checkRateLimit(ip) {
   const now = Date.now();
   const attempts = loginAttempts.get(ip) || [];
   // Filter out old attempts
   const recent = attempts.filter(t => now - t < RATE_LIMIT_WINDOW_MS);
-  
+
   if (recent.length >= RATE_LIMIT_MAX_ATTEMPTS) {
     return false; // Rate limited
   }
-  
+
   recent.push(now);
   loginAttempts.set(ip, recent);
   return true;
@@ -95,16 +109,16 @@ function generateBetaCode() {
 /**
  * Check if beta code already exists in database
  */
-function betaCodeExists(db, code) {
-  const result = db.prepare('SELECT 1 FROM beta_invites WHERE code = ? LIMIT 1').get(code);
+async function betaCodeExists(db, code) {
+  const result = await db.prepare('SELECT 1 FROM beta_invites WHERE code = ? LIMIT 1').get(code);
   return !!result;
 }
 
 /**
  * Check if email already has an active invite
  */
-function getExistingInvite(db, email) {
-  return db.prepare(`
+async function getExistingInvite(db, email) {
+  return await db.prepare(`
     SELECT id, email, code, status, created_at
     FROM beta_invites
     WHERE email = ? AND status IN ('pending', 'sent')
@@ -115,10 +129,10 @@ function getExistingInvite(db, email) {
 /**
  * Generate unique beta code with collision retry (max 3 attempts)
  */
-function generateUniqueBetaCode(db, maxRetries = 3) {
+async function generateUniqueBetaCode(db, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
     const code = generateBetaCode();
-    if (!betaCodeExists(db, code)) {
+    if (!(await betaCodeExists(db, code))) {
       return code;
     }
   }
@@ -131,13 +145,13 @@ async function adminRoutes(fastify) {
   try {
     const db = fastify.db;
     if (db) {
-      db.prepare(`
+      await db.prepare(`
         CREATE TABLE IF NOT EXISTS beta_invites (
           id TEXT PRIMARY KEY,
           email TEXT NOT NULL,
           code TEXT NOT NULL UNIQUE,
           status TEXT DEFAULT 'pending',
-          created_at TEXT DEFAULT (datetime('now')),
+          created_at TIMESTAMP DEFAULT NOW(),
           sent_at TEXT,
           failed_at TEXT
         )
@@ -148,9 +162,13 @@ async function adminRoutes(fastify) {
   }
 
   // Auth check
-  fastify.post('/admin/login', async (req, reply) => {
+  fastify.post('/admin/login', {
+    config: {
+      rateLimit: { max: 5, timeWindow: '15 minutes' }
+    }
+  }, async (req, reply) => {
     const clientIp = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-    
+
     // Rate limiting
     if (!checkRateLimit(clientIp)) {
       reply.code(429);
@@ -159,7 +177,7 @@ async function adminRoutes(fastify) {
 
     const { password } = req.body || {};
     const adminSecret = getAdminSecret();
-    
+
     if (!password || password !== adminSecret) {
       reply.code(401);
       return { error: 'Unauthorized' };
@@ -172,18 +190,18 @@ async function adminRoutes(fastify) {
   // Logout - invalidate token server-side
   fastify.post('/admin/logout', async (req, reply) => {
     const token = req.headers['x-admin-token'];
-    
+
     if (token && sessionTokens.has(token)) {
       sessionTokens.delete(token);
     }
-    
+
     return { ok: true };
   });
 
   // Stats endpoint
   fastify.get('/admin/stats', async (req, reply) => {
     const token = req.headers['x-admin-token'];
-    
+
     if (!token || !validateSessionToken(token)) {
       reply.code(401);
       return { error: 'Unauthorized' };
@@ -196,24 +214,24 @@ async function adminRoutes(fastify) {
     }
 
     try {
-      const totalSubscribers = db.prepare('SELECT COUNT(*) as n FROM subscribers').get().n;
-      const confirmed = db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE confirmed_at IS NOT NULL').get().n;
-      const active = db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE active=1 AND confirmed_at IS NOT NULL').get().n;
+      const totalSubscribers = (await db.prepare('SELECT COUNT(*) as n FROM subscribers').get()).n;
+      const confirmed = (await db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE confirmed_at IS NOT NULL').get()).n;
+      const active = (await db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE active=1 AND confirmed_at IS NOT NULL').get()).n;
       const today = new Date().toISOString().slice(0,10);
-      const newToday = db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE date(created_at)=?').get(today).n;
+      const newToday = (await db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE date(created_at)=?').get(today)).n;
 
-      const byZone = db.prepare(`
-        SELECT climate_zone_id, COUNT(*) as n 
-        FROM subscribers 
+      const byZone = await db.prepare(`
+        SELECT climate_zone_id, COUNT(*) as n
+        FROM subscribers
         WHERE confirmed_at IS NOT NULL
-        GROUP BY climate_zone_id 
+        GROUP BY climate_zone_id
         ORDER BY n DESC
       `).all();
 
-      const recentSubs = db.prepare(`
-        SELECT email, location_city, location_country, climate_zone_id, created_at 
-        FROM subscribers 
-        ORDER BY created_at DESC 
+      const recentSubs = await db.prepare(`
+        SELECT email, location_city, location_country, climate_zone_id, created_at
+        FROM subscribers
+        ORDER BY created_at DESC
         LIMIT 10
       `).all();
 
@@ -233,7 +251,7 @@ async function adminRoutes(fastify) {
   // Beta invite: POST /api/admin/beta-invite
   fastify.post('/admin/beta-invite', async (req, reply) => {
     const token = req.headers['x-admin-token'];
-    
+
     if (!token || !validateSessionToken(token)) {
       reply.code(401);
       return { error: 'Unauthorized' };
@@ -252,10 +270,10 @@ async function adminRoutes(fastify) {
     }
 
     let inviteId = uuidv4();
-    
+
     try {
       // Check for existing active invite (unless force override)
-      const existing = getExistingInvite(db, email);
+      const existing = await getExistingInvite(db, email);
       if (existing && !force) {
         reply.code(409);
         return {
@@ -267,12 +285,12 @@ async function adminRoutes(fastify) {
       }
 
       // Generate unique beta code (retry up to 3 times)
-      const betaCode = generateUniqueBetaCode(db);
+      const betaCode = await generateUniqueBetaCode(db);
 
       // Step 1: Insert DB row with status='pending' FIRST (before Stripe creation)
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO beta_invites (id, email, code, status, created_at)
-        VALUES (?, ?, ?, 'pending', datetime('now'))
+        VALUES (?, ?, ?, 'pending', NOW())
       `).run(inviteId, email, betaCode);
 
       fastify.log.info(`[BETA] DB record created (pending) for ${email} with code ${betaCode}`);
@@ -303,13 +321,12 @@ async function adminRoutes(fastify) {
         </head>
         <body>
           <div class="container">
-            <img src="https://theplotline.net/logo-v4.png" alt="The Plot Line" style="height:80px;width:auto;display:block;margin:0 auto 24px;" />
-            <img src="https://theplotline.net/logo-v4.png" alt="The Plot Line" style="height:60px;width:auto;display:block;margin:0 auto 20px;" />
+            <img src="${process.env.CLIENT_URL}/logo-v4.png" alt="The Plot Line" style="height:80px;width:auto;display:block;margin:0 auto 24px;" />
             <p>We'd love to have you join us for a month of free garden conversations.</p>
             <p>Use this code at checkout:</p>
             <div class="code-box">${betaCode}</div>
             <p>This gives you one month free. Start your journey:</p>
-            <a href="https://theplotline.net/?email=${encodeURIComponent(email)}" class="button">Sign Up for The Plot Line</a>
+            <a href="${process.env.CLIENT_URL}/?email=${encodeURIComponent(email)}" class="button">Sign Up for The Plot Line</a>
             <div class="footer">
               <p>Any questions? Reply to this email or reach out to hello@theplotline.net</p>
             </div>
@@ -325,7 +342,7 @@ We'd love to have you join us for a month of free garden conversations.
 Use this code at checkout: ${betaCode}
 
 This gives you one month free. Start your journey:
-https://theplotline.net
+${process.env.CLIENT_URL}
 
 Any questions? Reply to this email or reach out to hello@theplotline.net`;
 
@@ -339,9 +356,9 @@ Any questions? Reply to this email or reach out to hello@theplotline.net`;
       fastify.log.info(`[BETA] Sent invite email to ${email}`);
 
       // Step 4: Update DB status to 'sent'
-      db.prepare(`
+      await db.prepare(`
         UPDATE beta_invites
-        SET status = 'sent', sent_at = datetime('now')
+        SET status = 'sent', sent_at = NOW()
         WHERE id = ?
       `).run(inviteId);
 
@@ -349,12 +366,12 @@ Any questions? Reply to this email or reach out to hello@theplotline.net`;
 
     } catch (err) {
       fastify.log.error('Beta invite error:', err);
-      
+
       // If DB record was created, mark as failed
       try {
-        db.prepare(`
+        await db.prepare(`
           UPDATE beta_invites
-          SET status = 'failed', failed_at = datetime('now')
+          SET status = 'failed', failed_at = NOW()
           WHERE id = ?
         `).run(inviteId);
       } catch (updateErr) {
@@ -362,7 +379,6 @@ Any questions? Reply to this email or reach out to hello@theplotline.net`;
       }
 
       reply.code(500);
-      // Return generic error message to client, keep full error server-side only
       return { error: 'Failed to send beta invite' };
     }
   });
@@ -370,7 +386,7 @@ Any questions? Reply to this email or reach out to hello@theplotline.net`;
   // Beta invites list: GET /api/admin/beta-invites
   fastify.get('/admin/beta-invites', async (req, reply) => {
     const token = req.headers['x-admin-token'];
-    
+
     if (!token || !validateSessionToken(token)) {
       reply.code(401);
       return { error: 'Unauthorized' };
@@ -383,7 +399,7 @@ Any questions? Reply to this email or reach out to hello@theplotline.net`;
     }
 
     try {
-      const invites = db.prepare(`
+      const invites = await db.prepare(`
         SELECT email, code, status, created_at, sent_at, failed_at
         FROM beta_invites
         ORDER BY created_at DESC

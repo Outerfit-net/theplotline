@@ -202,12 +202,12 @@ Do not include any other text, explanation, or markdown. Just the JSON array.`;
  * Lazy-generates if not cached
  * @param {string} climateZoneId
  * @param {string} authorKey
- * @param {object} db - better-sqlite3 instance
- * @returns {Promise<array>} - array of { id, climate_zone_id, author_key, season_number, season_name, generated_at }
+ * @param {object} db - database wrapper (fastify.db or compatible)
+ * @returns {Promise<array>}
  */
 async function getSeasonNames(climateZoneId, authorKey, db) {
   // Check cache first
-  const cached = db.prepare(`
+  const cached = await db.prepare(`
     SELECT * FROM author_season_names
     WHERE climate_zone_id = ? AND author_key = ?
     ORDER BY season_number
@@ -221,7 +221,7 @@ async function getSeasonNames(climateZoneId, authorKey, db) {
   console.log(`[seasonNames] Cache miss: ${climateZoneId}/${authorKey} (found ${cached.length}/12)`);
 
   // Load micro-seasons from DB
-  const microSeasons = db.prepare(`
+  const microSeasons = await db.prepare(`
     SELECT season_number, name, observable_signal FROM micro_seasons
     WHERE climate_zone_id = ?
     ORDER BY season_number
@@ -235,30 +235,24 @@ async function getSeasonNames(climateZoneId, authorKey, db) {
   console.log(`[seasonNames] Calling Ollama to generate ${climateZoneId}/${authorKey}`);
   const generatedNames = await callOllama(climateZoneId, authorKey, microSeasons);
 
-  // Store all 12 in DB
-  const insertStmt = db.prepare(`
-    INSERT INTO author_season_names (id, climate_zone_id, author_key, season_number, season_name)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-
-  const transaction = db.transaction(() => {
-    for (const item of generatedNames) {
-      insertStmt.run(
-        uuidv4(),
-        climateZoneId,
-        authorKey,
-        item.season_number,
-        item.name
-      );
-    }
-  });
-
-  transaction();
+  // Store all 12 in DB (sequential inserts)
+  for (const item of generatedNames) {
+    await db.prepare(`
+      INSERT INTO author_season_names (id, climate_zone_id, author_key, season_number, season_name)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      uuidv4(),
+      climateZoneId,
+      authorKey,
+      item.season_number,
+      item.name
+    );
+  }
 
   console.log(`[seasonNames] Stored ${generatedNames.length} season names`);
 
   // Return from DB (to get all fields including id and generated_at)
-  return db.prepare(`
+  return await db.prepare(`
     SELECT * FROM author_season_names
     WHERE climate_zone_id = ? AND author_key = ?
     ORDER BY season_number
@@ -271,7 +265,7 @@ async function getSeasonNames(climateZoneId, authorKey, db) {
  * @param {string} climateZoneId
  * @param {string} authorKey
  * @param {number} seasonNumber
- * @param {object} db - better-sqlite3 instance
+ * @param {object} db - database wrapper (fastify.db or compatible)
  * @returns {Promise<string>} - the season name
  */
 async function getSeasonName(climateZoneId, authorKey, seasonNumber, db) {

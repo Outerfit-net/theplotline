@@ -7,14 +7,15 @@ const { runDispatch } = require('./dispatch');
 
 /**
  * Register all cron jobs
+ * @param {object} db - database wrapper (fastify.db)
  */
-function registerCrons() {
+function registerCrons(db) {
   // Daily dispatch at 6:00 AM local time
   // Cron format: minute hour day-of-month month day-of-week
   cron.schedule('0 6 * * *', async () => {
     console.log('[cron] Starting daily dispatch...');
     try {
-      await runDispatch();
+      await runDispatch(db);
       console.log('[cron] Daily dispatch completed');
     } catch (err) {
       console.error('[cron] Daily dispatch failed:', err);

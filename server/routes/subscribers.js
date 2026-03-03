@@ -2,19 +2,20 @@
  * Subscriber routes — v2: global climate zone system
  */
 
-const Database = require('better-sqlite3');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
-const path = require('path');
 
 const { geocodeWithRetry: geocode } = require('../services/geocode');
 const { getStationInfo } = require('../services/nws');
 const { sendConfirmationEmail } = require('../services/email');
 const { assignClimateZone, getHemisphere } = require('../services/climate');
 
-const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', '..', 'data', 'plotlines.db');
+const VALID_AUTHORS = [
+  'hemingway', 'carver', 'munro', 'morrison', 'oates', 'lopez',
+  'strout', 'bass', 'mccarthy', 'oconnor', 'hurston', 'saunders',
+  'vonnegut', 'robbins', 'gabaldon'
+];
 
-function getDb() { return new Database(DB_PATH); }
 function generateToken() { return crypto.randomBytes(32).toString('hex'); }
 
 /**
@@ -37,7 +38,7 @@ function buildLocationKey(country, stationCode, lat, lon) {
  */
 async function verifyTurnstile(cf_turnstile_response, remoteip) {
   const secret = process.env.TURNSTILE_SECRET_KEY;
-  
+
   // Dev mode: skip verification if secret not set
   if (!secret) {
     console.warn('[turnstile] Secret key not set, skipping verification (dev mode)');
@@ -70,7 +71,11 @@ async function verifyTurnstile(cf_turnstile_response, remoteip) {
 async function subscriberRoutes(fastify) {
 
   // ── POST /api/subscribe ───────────────────────────────────────────────────
-  fastify.post('/subscribe', async (request, reply) => {
+  fastify.post('/subscribe', {
+    config: {
+      rateLimit: { max: 5, timeWindow: '15 minutes' }
+    }
+  }, async (request, reply) => {
     const {
       email,
       city,
@@ -90,6 +95,11 @@ async function subscriberRoutes(fastify) {
       return reply.code(400).send({ error: 'Invalid email format' });
     }
 
+    // Validate author parameter
+    if (!VALID_AUTHORS.includes(author)) {
+      return reply.code(400).send({ error: `Invalid author: must be one of ${VALID_AUTHORS.join(', ')}` });
+    }
+
     // ── Verify Turnstile ──────────────────────────────────────────────────────
     const turnstileVerification = await verifyTurnstile(cf_turnstile_response, request.ip);
     if (!turnstileVerification.success) {
@@ -97,10 +107,10 @@ async function subscriberRoutes(fastify) {
       return reply.code(403).send({ error: 'Bot check failed' });
     }
 
-    const db = getDb();
+    const db = fastify.db;
     try {
       // Check existing
-      const existing = db.prepare(
+      const existing = await db.prepare(
         'SELECT id, active, confirmed_at FROM subscribers WHERE email = ?'
       ).get(email);
 
@@ -115,23 +125,24 @@ async function subscriberRoutes(fastify) {
         const confirmToken = generateToken();
         const unsubscribeToken = generateToken();
         if (!existing.active) {
-          db.prepare(`
+          await db.prepare(`
             UPDATE subscribers SET active=1, unsubscribed_at=NULL,
-              confirm_token=?, unsubscribe_token=?, auth_token_expires_at=datetime("now", "+1 year"),
+              confirm_token=?, unsubscribe_token=?, management_token=?,
+              auth_token_expires_at=NOW() + INTERVAL '1 year',
               location_city=?, location_state=?, location_country=?, author_key=?, zipcode=?
             WHERE id=?
-          `).run(confirmToken, unsubscribeToken, city, state || '', country, author, zipcode || '', existing.id);
+          `).run(confirmToken, unsubscribeToken, uuidv4(), city, state || '', country, author, zipcode || '', existing.id);
           await sendConfirmationEmail(email, confirmToken);
           return reply.code(200).send({ message: 'Subscription reactivated. Please check your email to confirm.' });
         }
-        db.prepare('UPDATE subscribers SET confirm_token=? WHERE id=?').run(confirmToken, existing.id);
+        await db.prepare('UPDATE subscribers SET confirm_token=? WHERE id=?').run(confirmToken, existing.id);
         await sendConfirmationEmail(email, confirmToken);
         return reply.code(200).send({ message: 'Confirmation email resent. Please check your inbox.' });
       }
 
       // ── Resolve location ──────────────────────────────────────────────────
       let lat = null, lon = null, stationCode = null, timezone = null;
-      
+
       // Prefer zipcode for geocoding if provided
       const locationQuery = (zipcode && country.toUpperCase() === 'US')
         ? zipcode
@@ -169,28 +180,29 @@ async function subscriberRoutes(fastify) {
       const id = uuidv4();
       const confirmToken = generateToken();
       const unsubscribeToken = generateToken();
+      const managementToken = uuidv4();
 
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO subscribers (
           id, email, location_city, location_state, location_country, zipcode,
           lat, lon, hemisphere, author_key, climate_zone_id, station_code,
-          confirm_token, unsubscribe_token
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          confirm_token, unsubscribe_token, management_token
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id, email, city, state || '', country, zipcode || '',
         lat, lon, hemisphere, author, climateZoneId, stationCode,
-        confirmToken, unsubscribeToken
+        confirmToken, unsubscribeToken, managementToken
       );
 
       // ── Create or find combination ────────────────────────────────────────
       if (lat !== null) {
         const locationKey = buildLocationKey(country, stationCode, lat, lon);
-        const existingCombo = db.prepare(
+        const existingCombo = await db.prepare(
           'SELECT id FROM combinations WHERE location_key=? AND author_key=?'
         ).get(locationKey, author);
 
         if (!existingCombo) {
-          db.prepare(`
+          await db.prepare(`
             INSERT INTO combinations (
               id, location_key, author_key, climate_zone_id,
               location_city, location_state, location_country,
@@ -209,7 +221,6 @@ async function subscriberRoutes(fastify) {
       // Send confirmation
       await sendConfirmationEmail(email, confirmToken);
 
-      db.close();
       return reply.code(201).send({
         message: 'Subscription created. Please check your email to confirm.',
         id,
@@ -217,18 +228,21 @@ async function subscriberRoutes(fastify) {
       });
 
     } catch (err) {
-      db.close();
       console.error('[subscribe] Error:', err);
       return reply.code(500).send({ error: 'Failed to create subscription' });
     }
   });
 
   // ── GET /api/confirm/:token ───────────────────────────────────────────────
-  fastify.get('/confirm/:token', async (request, reply) => {
+  fastify.get('/confirm/:token', {
+    config: {
+      rateLimit: { max: 10, timeWindow: '1 hour' }
+    }
+  }, async (request, reply) => {
     const { token } = request.params;
-    const db = getDb();
+    const db = fastify.db;
     try {
-      const subscriber = db.prepare(
+      const subscriber = await db.prepare(
         'SELECT id, email, confirmed_at FROM subscribers WHERE confirm_token=?'
       ).get(token);
 
@@ -238,28 +252,25 @@ async function subscriberRoutes(fastify) {
         return reply.code(200).send({ message: 'Email already confirmed', email: subscriber.email });
       }
 
-      db.prepare(
-        "UPDATE subscribers SET confirmed_at=datetime('now'), confirm_token=NULL WHERE id=?"
+      await db.prepare(
+        "UPDATE subscribers SET confirmed_at=NOW(), confirm_token=NULL WHERE id=?"
       ).run(subscriber.id);
 
-      db.close();
       const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-      return reply.redirect(`${clientUrl}?confirmed=true&email=${encodeURIComponent(subscriber.email)}&sid=${subscriber.id}`);
+      return reply.redirect(`${clientUrl}?confirmed=true&email=${encodeURIComponent(subscriber.email)}`);
     } catch (err) {
-      db.close();
       return reply.code(500).send({ error: 'Failed to confirm subscription' });
     }
   });
 
   // ── GET/POST /api/unsubscribe ─────────────────────────────────────────────
-  fastify.get('/unsubscribe', async (request, reply) => handleUnsubscribe(request.query.token, reply));
-  fastify.post('/unsubscribe', async (request, reply) => handleUnsubscribe(request.body.token, reply));
+  fastify.get('/unsubscribe', async (request, reply) => handleUnsubscribe(fastify.db, request.query.token, reply));
+  fastify.post('/unsubscribe', async (request, reply) => handleUnsubscribe(fastify.db, request.body.token, reply));
 
-  async function handleUnsubscribe(token, reply) {
+  async function handleUnsubscribe(db, token, reply) {
     if (!token) return reply.code(400).send({ error: 'Missing unsubscribe token' });
-    const db = getDb();
     try {
-      const subscriber = db.prepare(
+      const subscriber = await db.prepare(
         'SELECT id, auth_token_expires_at FROM subscribers WHERE unsubscribe_token=?'
       ).get(token);
 
@@ -273,14 +284,12 @@ async function subscriberRoutes(fastify) {
         }
       }
 
-      db.prepare(
-        "UPDATE subscribers SET active=0, unsubscribed_at=datetime('now') WHERE id=?"
+      await db.prepare(
+        "UPDATE subscribers SET active=0, unsubscribed_at=NOW() WHERE id=?"
       ).run(subscriber.id);
 
-      db.close();
       return reply.code(200).send({ message: 'Successfully unsubscribed' });
     } catch (err) {
-      db.close();
       return reply.code(500).send({ error: 'Failed to unsubscribe' });
     }
   }
@@ -289,9 +298,9 @@ async function subscriberRoutes(fastify) {
   // Let subscribers check their own status / preferences by unsubscribe token
   fastify.get('/subscriber/:token', async (request, reply) => {
     const { token } = request.params;
-    const db = getDb();
+    const db = fastify.db;
     try {
-      const sub = db.prepare(`
+      const sub = await db.prepare(`
         SELECT s.id, s.email, s.location_city, s.location_state, s.location_country,
                s.author_key, s.climate_zone_id, s.active, s.confirmed_at,
                s.auth_token_expires_at,
@@ -311,23 +320,19 @@ async function subscriberRoutes(fastify) {
         }
       }
 
-      db.close();
       return reply.code(200).send(sub);
     } catch (err) {
-      db.close();
       return reply.code(500).send({ error: 'Failed to fetch subscriber' });
     }
   });
 
   // ── GET /api/climate-zones ─────────────────────────────────────────────────
   fastify.get('/climate-zones', async (request, reply) => {
-    const db = getDb();
+    const db = fastify.db;
     try {
-      const zones = db.prepare('SELECT * FROM climate_zones ORDER BY name').all();
-      db.close();
+      const zones = await db.prepare('SELECT * FROM climate_zones ORDER BY name').all();
       return reply.code(200).send({ zones });
     } catch (err) {
-      db.close();
       return reply.code(500).send({ error: 'Failed to fetch climate zones' });
     }
   });

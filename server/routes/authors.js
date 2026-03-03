@@ -2,32 +2,21 @@
  * Authors routes
  */
 
-const Database = require('better-sqlite3');
-const path = require('path');
-
-const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', '..', 'data', 'plotlines.db');
-
-function getDb() {
-  return new Database(DB_PATH);
-}
-
 async function authorRoutes(fastify) {
   /**
    * GET /api/authors
    * List all active authors
    */
   fastify.get('/authors', async (request, reply) => {
-    const db = getDb();
+    const db = fastify.db;
 
     try {
-      const authors = db.prepare(`
+      const authors = await db.prepare(`
         SELECT key, name, style_prompt
         FROM authors
         WHERE active = 1
         ORDER BY name
       `).all();
-
-      db.close();
 
       return reply.send({
         authors: authors.map(a => ({
@@ -38,7 +27,6 @@ async function authorRoutes(fastify) {
       });
 
     } catch (err) {
-      db.close();
       console.error('Authors error:', err);
 
       // Fallback to hardcoded list if DB not initialized
