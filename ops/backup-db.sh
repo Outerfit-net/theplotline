@@ -5,11 +5,11 @@ set -euo pipefail
 DATE=$(date +%Y%m%d_%H%M%S)
 
 # Backup plotlines
-PGPASSWORD="${PGPASSWORD:-plines2026}" pg_dump -U plotlines -h localhost plotlines | gzip > /tmp/plotlines_${DATE}.sql.gz
+PGPASSWORD="${PGPASSWORD:?PGPASSWORD must be set}" pg_dump -U plotlines -h localhost plotlines | gzip > /tmp/plotlines_${DATE}.sql.gz
 rclone copy /tmp/plotlines_${DATE}.sql.gz outerfit-backups:outerfit-llc/plotlines/
 
 # Backup thread
-PGPASSWORD="${PGPASSWORD:-plines2026}" pg_dump -U plotlines -h localhost thread | gzip > /tmp/thread_${DATE}.sql.gz
+PGPASSWORD="${PGPASSWORD}" pg_dump -U plotlines -h localhost thread | gzip > /tmp/thread_${DATE}.sql.gz
 rclone copy /tmp/thread_${DATE}.sql.gz outerfit-backups:outerfit-llc/thread/
 
 # Keep only last 7 days locally
