@@ -1,3 +1,5 @@
+# SOPS age configuration
+# Generated: 2026-03-03
 creation_rules:
-  - path_regex: \.env(\..*)?$
-    age: age1zw55vgqrrwvm236fc8f3qsgwpgvrc3ysdufnp72xgw5jpjg7ngzqf7tlpj
+  - path_regex: \.env$
+    age: age1zztcphpuj0kjscqnlfax84zpmlfqcf6vverw68gfa0eqcjys8v6qq5dfqp
