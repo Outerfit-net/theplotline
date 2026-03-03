@@ -141,14 +141,62 @@ thegarden.email {
 | Component | Technology | Notes |
 |-----------|------------|-------|
 | Signup app | React + Vite | Single page — email, region, author, frequency |
-| Backend | Fastify (port 3001) | Separate from outerfit (port 3000) |
-| Database | SQLite | garden.db — subscribers, history, preferences |
-| LLM calls | Existing script | Already works — wire into job runner |
-| Weather | Open-Meteo | Free, already in outerfit stack |
-| Email | Resend | Already in outerfit stack |
-| Payments | Stripe | Already in outerfit stack — separate product |
-| Scheduling | node-cron | Morning dispatch job |
-| Domain | thegarden.email (suggested) | Or garden.outerfit.net |
+| Backend | Fastify 4.x (port 3001) | Separate from outerfit (port 3000) |
+| Database | SQLite | plotlines.db — subscribers, combinations, daily_runs, deliveries |
+| LLM calls | Python engine | `server/garden/engine.py` — spawned per combo, output JSON |
+| Weather | NWS + Open-Meteo fallback | NWS for US stations, Open-Meteo international |
+| Email | SMTP (nodemailer) | Confirmation + daily dispatch + gift emails |
+| Payments | Stripe | Checkout, webhooks, referrals, gifts, beta invites |
+| Mastheads | PIL (Python) | Lazy-generated 600×100 PNGs, cached in `/data/mastheads/` |
+| Static files | @fastify/static v7 | Serves `/mastheads/` — must use v7 for Fastify 4 compat |
+| Scheduling | node-cron | Daily dispatch 6:00 AM |
+| Domain | theplotline.net | Cloudflare proxied |
+
+### Daily Dispatch Flow
+
+Runs at 6:00 AM daily (`server/cron/dispatch.js`):
+
+```
+For each active location+author combo:
+  1. Run Python engine → prose_text, prose_html, topic, quote, weather_summary
+  2. Store result in daily_runs table
+  3. Get author-voiced season name (micro_seasons table)
+  4. Generate (or load cached) masthead PNG
+     → station-author-season-weather.png in /data/mastheads/
+     → served at https://theplotline.net/mastheads/<file>.png
+  5. For each active confirmed subscriber in that combo:
+     → sendDailyEmail() with masthead_url + prose + footer links
+     → Record delivery in deliveries table
+```
+
+**Email footer links** (all use `email+token` for auth):
+- Manage subscription → `/manage?email=&token=`
+- Invite a friend → `/manage?email=&token=#invite`
+- Gift a subscription → `/manage?email=&token=#gift`
+- Cancel → `/manage?email=&token=#cancel`
+
+### Stripe Payments
+
+**Plans:**
+- Weekly: $1.99/week
+- Daily: $3.99/day
+
+**Flow:**
+1. User subscribes via `/api/subscribe` → gets confirmation email with token
+2. Confirms email → status changes to 'active' (unconfirmed → active)
+3. User clicks "Subscribe" → `/api/stripe/create-checkout` → Stripe Checkout session
+4. Stripe webhook `/api/stripe/webhook` receives:
+   - `checkout.session.completed` → activate subscription
+   - `customer.subscription.updated` → sync status
+   - `customer.subscription.deleted` → cancel subscription
+   - `invoice.payment_failed` → mark as past_due
+5. Referral: user enters referral code at signup → referrer gets free month on referee's first payment
+6. Gift: purchaser buys gift code → recipient gets email with code → redeems for free subscription period
+
+**Beta Invite System:**
+- Beta codes (`BETA-*`) bypass payment during checkout
+- Used for early access, press, friends & family
+- Tracked in `beta_invite` field on subscriber
 
 ### Database Schema
 
@@ -166,9 +214,41 @@ CREATE TABLE IF NOT EXISTS subscribers (
   frequency       TEXT DEFAULT 'daily',  -- 'daily' | 'weekly'
   weekly_day      TEXT DEFAULT 'monday', -- for weekly subscribers
   timezone        TEXT DEFAULT 'America/Denver',
-  status          TEXT DEFAULT 'active', -- 'active' | 'paused' | 'cancelled'
+  status          TEXT DEFAULT 'active', -- 'active' | 'paused' | 'cancelled' | 'unconfirmed'
   stripe_customer_id TEXT,
-  subscription_id TEXT,
+  stripe_subscription_id TEXT,
+  subscription_plan TEXT,               -- 'daily' | 'weekly'
+  subscription_status TEXT,              -- from Stripe: 'active', 'past_due', 'canceled', etc.
+  subscription_end_date DATETIME,       -- when current period ends
+  unsubscribe_token TEXT,
+  referrer_id     TEXT,                 -- who referred this subscriber
+  referral_code   TEXT UNIQUE,         -- this subscriber's referral code
+  gift_recipient_email TEXT,            -- if this is a gift sub
+  gift_sender_email TEXT,               -- who sent the gift
+  beta_invite    TEXT,                 -- beta invite code used
+  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  confirmed_at    DATETIME
+);
+
+-- Referral tracking
+CREATE TABLE IF NOT EXISTS referrals (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  referrer_id     TEXT NOT NULL,         -- subscriber's referral_code
+  referee_email   TEXT NOT NULL,        -- new subscriber's email
+  status          TEXT DEFAULT 'pending', -- 'pending' | 'completed' | 'expired'
+  reward_applied  DATETIME,
+  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Gift subscriptions
+CREATE TABLE IF NOT EXISTS gifts (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  gift_code       TEXT UNIQUE NOT NULL,
+  purchaser_email TEXT NOT NULL,
+  recipient_email TEXT,
+  plan            TEXT NOT NULL,         -- 'daily' | 'weekly'
+  redeemed_at     DATETIME,
+  expires_at      DATETIME NOT NULL,
   created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

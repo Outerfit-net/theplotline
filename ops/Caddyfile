@@ -1,0 +1,62 @@
+# THREAD — AI Wardrobe Stylist
+outerfit.net, www.outerfit.net {
+    tls {
+        dns cloudflare ngl-DH8x_yJAqr5V0s1OynrjN0m3a256kP86eScd
+    }
+
+    handle /api/* {
+        reverse_proxy localhost:3000
+    }
+
+    handle {
+        root * /opt/thread/client/dist
+        file_server
+        try_files {path} /index.html
+    }
+
+    request_body {
+        max_size 100MB
+    }
+
+    @static path *.js *.css *.png *.jpg *.jpeg *.webp *.svg *.woff2
+    header @static Cache-Control "public, max-age=86400"
+
+    header {
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    log {
+        output file /var/log/caddy/thread.log
+    }
+}
+
+# Plot Lines — Garden newsletter
+theplotline.net, www.theplotline.net {
+    tls {
+        dns cloudflare ngl-DH8x_yJAqr5V0s1OynrjN0m3a256kP86eScd
+    }
+
+    handle /api/* {
+        reverse_proxy localhost:3001
+    }
+
+    handle {
+        root * /opt/plotlines/client/dist
+        file_server
+        try_files {path} /index.html
+    }
+
+    request_body {
+        max_size 10MB
+    }
+
+    log {
+        output file /var/log/caddy/plotlines.log
+    }
+}
+
+# Ollama API — Tailscale only (not public!)
+:11435 {
+    @tailscale remote_ip 100.0.0.0/8
+    reverse_proxy @tailscale localhost:11434
+}

@@ -117,7 +117,7 @@ async function subscriberRoutes(fastify) {
         if (!existing.active) {
           db.prepare(`
             UPDATE subscribers SET active=1, unsubscribed_at=NULL,
-              confirm_token=?, unsubscribe_token=?,
+              confirm_token=?, unsubscribe_token=?, auth_token_expires_at=datetime("now", "+1 year"),
               location_city=?, location_state=?, location_country=?, author_key=?, zipcode=?
             WHERE id=?
           `).run(confirmToken, unsubscribeToken, city, state || '', country, author, zipcode || '', existing.id);
@@ -244,7 +244,7 @@ async function subscriberRoutes(fastify) {
 
       db.close();
       const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
-      return reply.redirect(`${clientUrl}?confirmed=true`);
+      return reply.redirect(`${clientUrl}?confirmed=true&email=${encodeURIComponent(subscriber.email)}&sid=${subscriber.id}`);
     } catch (err) {
       db.close();
       return reply.code(500).send({ error: 'Failed to confirm subscription' });
@@ -260,17 +260,25 @@ async function subscriberRoutes(fastify) {
     const db = getDb();
     try {
       const subscriber = db.prepare(
-        'SELECT id, email FROM subscribers WHERE unsubscribe_token=?'
+        'SELECT id, auth_token_expires_at FROM subscribers WHERE unsubscribe_token=?'
       ).get(token);
 
       if (!subscriber) return reply.code(404).send({ error: 'Invalid unsubscribe token' });
+
+      // Check token expiry
+      if (subscriber.auth_token_expires_at) {
+        const expires = new Date(subscriber.auth_token_expires_at);
+        if (expires < new Date()) {
+          return reply.code(401).send({ error: 'Token expired. Please resubscribe.' });
+        }
+      }
 
       db.prepare(
         "UPDATE subscribers SET active=0, unsubscribed_at=datetime('now') WHERE id=?"
       ).run(subscriber.id);
 
       db.close();
-      return reply.code(200).send({ message: 'Successfully unsubscribed', email: subscriber.email });
+      return reply.code(200).send({ message: 'Successfully unsubscribed' });
     } catch (err) {
       db.close();
       return reply.code(500).send({ error: 'Failed to unsubscribe' });
@@ -286,6 +294,7 @@ async function subscriberRoutes(fastify) {
       const sub = db.prepare(`
         SELECT s.id, s.email, s.location_city, s.location_state, s.location_country,
                s.author_key, s.climate_zone_id, s.active, s.confirmed_at,
+               s.auth_token_expires_at,
                cz.name as climate_zone_name
         FROM subscribers s
         LEFT JOIN climate_zones cz ON cz.id = s.climate_zone_id
@@ -293,6 +302,14 @@ async function subscriberRoutes(fastify) {
       `).get(token);
 
       if (!sub) return reply.code(404).send({ error: 'Not found' });
+
+      // Check token expiry
+      if (sub.auth_token_expires_at) {
+        const expires = new Date(sub.auth_token_expires_at);
+        if (expires < new Date()) {
+          return reply.code(401).send({ error: 'Token expired. Please resubscribe.' });
+        }
+      }
 
       db.close();
       return reply.code(200).send(sub);

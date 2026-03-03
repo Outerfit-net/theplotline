@@ -194,6 +194,10 @@ function SignupForm({ onSignupSuccess }) {
         <p className="mt-4 text-xs text-center text-[var(--color-text-muted)]">
           Free daily delivery. Unsubscribe anytime. US and Canada.
         </p>
+        <p className="mt-2 text-xs text-center text-[var(--color-text-muted)]">
+          By subscribing, you agree to our <a href="/about" className="underline hover:text-[var(--color-green)]">Privacy Policy</a>. 
+          We collect only your email and location for delivering letters. We never share or sell your data.
+        </p>
       </form>
     </div>
   );

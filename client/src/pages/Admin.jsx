@@ -13,6 +13,7 @@ export default function Admin() {
   const [betaMessage, setBetaMessage] = useState('');
   const [betaError, setBetaError] = useState('');
   const [betaInvites, setBetaInvites] = useState([]);
+  const [codestat, setCodestat] = useState(null);
 
   const token = localStorage.getItem('admin-token');
 
@@ -60,6 +61,15 @@ export default function Admin() {
         setError('Failed to load stats');
         setLoading(false);
       });
+  }, [authed, token]);
+
+  // Load code stats
+  useEffect(() => {
+    if (!authed) return;
+    fetch('/api/admin/codestat', { headers: { 'x-admin-token': token } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setCodestat(d); })
+      .catch(() => {});
   }, [authed, token]);
 
   // Load beta invites
@@ -171,6 +181,41 @@ export default function Admin() {
           </div>
         ))}
       </div>
+
+      {/* Code Stats */}
+      {codestat && (
+        <section className="mb-12">
+          <h2 className="text-xl text-[var(--color-green-dark)] mb-4">Codebase</h2>
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            {[
+              { label: 'Source files', value: codestat.src.files },
+              { label: 'Source lines', value: codestat.src.lines.toLocaleString() },
+              { label: 'Test lines', value: codestat.tests.lines.toLocaleString() },
+            ].map(({ label, value }) => (
+              <div key={label} className="bg-white border border-[var(--color-cream-dark)] rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-[var(--color-green-dark)]">{value}</div>
+                <div className="text-sm text-[var(--color-text-muted)] mt-1">{label}</div>
+              </div>
+            ))}
+          </div>
+          <div className="bg-white border border-[var(--color-cream-dark)] rounded-lg p-4 flex items-center gap-6">
+            <div>
+              <span className="text-sm text-[var(--color-text-muted)]">Test files: </span>
+              <span className="font-semibold text-[var(--color-green-dark)]">{codestat.tests.files}</span>
+            </div>
+            <div>
+              <span className="text-sm text-[var(--color-text-muted)]">Test/src ratio: </span>
+              <span className="font-semibold text-[var(--color-green-dark)]">{codestat.ratio}x</span>
+            </div>
+            {Object.entries(codestat.byType).map(([ext, lines]) => (
+              <div key={ext}>
+                <span className="text-sm text-[var(--color-text-muted)]">.{ext}: </span>
+                <span className="font-semibold text-[var(--color-green-dark)]">{lines.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Beta Invites Section */}
       <section className="mb-12">

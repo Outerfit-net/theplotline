@@ -20,6 +20,11 @@ function Home() {
     if (params.get('confirmed') === 'true') {
       setConfirmed(true);
       setShowPlanSelector(true);
+      const email = params.get('email');
+      const sid = params.get('sid');
+      if (email && sid) {
+        setSubscriberData({ email, id: sid });
+      }
       window.history.replaceState({}, '', '/');
     }
   }, []);

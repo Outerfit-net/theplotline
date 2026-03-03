@@ -11,8 +11,56 @@ const { spawn } = require('child_process');
 const Database = require('better-sqlite3');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
+const fs = require('fs');
 const { sendDailyEmail } = require('../services/email');
 const { getSeasonName } = require('../services/seasonNames');
+const { detectWeatherType } = require('../services/weather');
+const { getSubRegion, getSubRegionFlavor } = require('../services/sub-regions');
+
+const MASTHEAD_DIR = path.join(__dirname, '..', '..', 'data', 'mastheads');
+const MASTHEAD_SCRIPT = path.join(__dirname, '..', 'services', 'generate_masthead.py');
+const APP_URL = process.env.APP_URL || 'https://theplotline.net';
+
+/**
+ * Get or generate a masthead image for a combo + run.
+ * Returns a public URL string, or null on failure.
+ */
+async function getMasthead(combo, dailyRun) {
+  const station = combo.station_code || combo.location_key || 'UNK';
+  const author = combo.author_key || 'hemingway';
+  const season = (dailyRun.season || 'spring').toLowerCase();
+  const weatherType = detectWeatherType(dailyRun.weather_summary || '');
+
+  const filename = `${station}-${author}-${season}-${weatherType}.png`;
+  const filepath = path.join(MASTHEAD_DIR, filename);
+
+  // Return cached if exists
+  if (fs.existsSync(filepath)) {
+    return `${APP_URL}/mastheads/${filename}`;
+  }
+
+  // Generate
+  return new Promise((resolve) => {
+    const proc = spawn('python3', [
+      MASTHEAD_SCRIPT, station, author, season, weatherType,
+      '--output', filepath
+    ], { timeout: 15000 });
+
+    proc.on('close', (code) => {
+      if (code === 0 && fs.existsSync(filepath)) {
+        resolve(`${APP_URL}/mastheads/${filename}`);
+      } else {
+        console.warn(`[masthead] Generation failed for ${filename} (code ${code})`);
+        resolve(null);
+      }
+    });
+
+    proc.on('error', (err) => {
+      console.warn(`[masthead] spawn error: ${err.message}`);
+      resolve(null);
+    });
+  });
+}
 
 const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', '..', 'data', 'plotlines.db');
 const PYTHON_PATH = process.env.PYTHON_PATH || 'python3';
@@ -80,6 +128,10 @@ function runEngine(combo) {
       '--lat', String(combo.lat || 39.7392),
       '--lon', String(combo.lon || -104.9903),
       '--context', combo.garden_context || '',
+      '--sub-region', (() => {
+        const id = getSubRegion(combo.station_code, combo.lat, combo.lon);
+        return id ? (getSubRegionFlavor(id) || '') : '';
+      })(),
       '--output', 'json'
     ];
 
@@ -228,6 +280,13 @@ async function runDispatch() {
         const authorSeasonName = await getAuthorSeasonName(dailyRun, combo, db);
         if (authorSeasonName) {
           dailyRun.author_season_name = authorSeasonName;
+        }
+
+        // Generate masthead (lazy, cached)
+        const mastheadUrl = await getMasthead(combo, dailyRun);
+        if (mastheadUrl) {
+          dailyRun.masthead_url = mastheadUrl;
+          console.log(`[dispatch] Masthead: ${mastheadUrl}`);
         }
 
         // Send emails

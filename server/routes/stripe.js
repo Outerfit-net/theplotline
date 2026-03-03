@@ -194,7 +194,7 @@ async function stripeRoutes(fastify) {
       
       // Verify gifter
       const gifterStmt = db.prepare(`
-        SELECT id, email FROM subscribers 
+        SELECT id, email, subscription_status FROM subscribers 
         WHERE email = ? AND unsubscribe_token = ?
         LIMIT 1
       `);
@@ -203,6 +203,11 @@ async function stripeRoutes(fastify) {
 
       if (!gifter) {
         return reply.code(401).send({ error: 'Invalid gifter email or token' });
+      }
+
+      // Check gifter has active subscription
+      if (gifter.subscription_status !== 'active') {
+        return reply.code(403).send({ error: 'Active subscription required to send gifts' });
       }
 
       // Check rate limit: max 5 gifts per day per subscriber
@@ -402,19 +407,25 @@ If you're not interested, you can ignore this email.
     let event;
 
     try {
-      // If webhook secret is empty, skip verification (test mode)
-      if (webhookSecret) {
-        // In production, you'd need raw body
-        // For now, just parse the body
-        event = typeof request.body === 'string' 
-          ? JSON.parse(request.body) 
-          : request.body;
-      } else {
-        // Test mode: parse body directly
-        event = typeof request.body === 'string' 
-          ? JSON.parse(request.body) 
-          : request.body;
+      if (!webhookSecret) {
+        fastify.log.error('Stripe webhook secret not configured');
+        return reply.code(500).send({ error: 'Webhook not configured' });
       }
+
+      // Stripe requires raw body for signature verification
+      // Fastify stores raw body in request.raw or we can get it from body if we configure it
+      // For Stripe webhooks, we need the raw request body as a string
+      const rawBody = request.body && typeof request.body === 'string' 
+        ? request.body 
+        : JSON.stringify(request.body);
+      
+      if (!rawBody) {
+        fastify.log.error('No body for webhook verification');
+        return reply.code(400).send({ error: 'Missing body' });
+      }
+
+      // Verify signature
+      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
     } catch (err) {
       fastify.log.error('Webhook signature verification failed:', err.message);
       return reply.code(400).send({ error: 'Invalid signature' });

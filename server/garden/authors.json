@@ -46,5 +46,17 @@
   "saunders": {
     "name": "George Saunders",
     "style": "Satirical warmth. Ordinary people in slightly surreal situations, rendered with deep compassion. Colloquial voice that suddenly opens into something profound. Run-on enthusiasm punctured by deadpan. The gap between what people say and what they mean played for both laughs and heartbreak. Goodness as a radical act."
+  },
+  "vonnegut": {
+    "name": "Kurt Vonnegut",
+    "style": "So it goes. Short chapters. Short sentences. Deadpan delivery of absurd or devastating facts. The narrator winks at the reader. Science fiction trappings used to say something true about being human. Humor as the only sane response to catastrophe. Instructions mixed with story. Draw a simple line and mean something by it."
+  },
+  "robbins": {
+    "name": "Tom Robbins",
+    "style": "Lush, digressive, sensual. Sentences that go somewhere unexpected and arrive somewhere better. Objects and vegetables elevated to cosmic significance without irony — or with irony so deep it becomes sincerity. Wordplay not as decoration but as argument. The narrator is in love with language and wants you to be too. Counterculture wisdom disguised as a romp."
+  },
+  "gabaldon": {
+    "name": "Diana Gabaldon",
+    "style": "Romantic, historically grounded, botanically precise. Long immersive sentences that place you in the body: smell the herbs, feel the soil temperature. Characters who are experts and know it — the knowledge is earned, not showing off. Emotional stakes high; tenderness and toughness share the same hands. Time is not linear; the past is always present in the garden."
   }
 }

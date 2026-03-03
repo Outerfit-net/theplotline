@@ -56,6 +56,7 @@ function initTestDb(dbPath) {
       subscription_status TEXT,
       subscription_end_date TEXT,
       referral_code TEXT,
+      beta_invite TEXT,
       FOREIGN KEY (climate_zone_id) REFERENCES climate_zones(id)
     )`,
     

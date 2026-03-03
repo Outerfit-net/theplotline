@@ -6,11 +6,34 @@
 require('dotenv').config();
 
 const fastify = require('fastify')({
-  logger: true
+  logger: true,
+  bodyLimit: 1048576,
 });
 const cors = require('@fastify/cors');
-const Database = require('better-sqlite3');
+const staticFiles = require('@fastify/static');
 const path = require('path');
+
+// Database setup - PostgreSQL
+const { Pool } = require('pg');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://plotlines:plines2026@localhost:5432/plotlines',
+});
+
+const db = {
+  prepare: (sql) => ({
+    run: (...params) => pool.query(sql, params),
+    get: async (...params) => {
+      const result = await pool.query(sql, params);
+      return result.rows[0];
+    },
+    all: async (...params) => {
+      const result = await pool.query(sql, params);
+      return result.rows;
+    },
+  }),
+  query: (...args) => pool.query(...args),
+  close: () => pool.end(),
+};
 
 const subscriberRoutes = require('./routes/subscribers');
 const authorRoutes = require('./routes/authors');
@@ -19,19 +42,32 @@ const { registerCrons } = require('./cron');
 
 const PORT = process.env.PORT || 3001;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
-const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', 'data', 'plotlines.db');
 
 async function start() {
   // Initialize shared database connection
-  const db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
   fastify.decorate('db', db);
+
+  // Security headers
+  fastify.addHook('onRequest', async (request, reply) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('X-XSS-Protection', '1; mode=block');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    reply.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  });
 
   // Register CORS
   await fastify.register(cors, {
     origin: [CLIENT_URL, 'http://localhost:5173', 'http://localhost:3000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
+  });
+
+  // Serve masthead images
+  await fastify.register(staticFiles, {
+    root: path.join(__dirname, '..', 'data', 'mastheads'),
+    prefix: '/mastheads/',
+    decorateReply: false,
   });
 
   // Health check
@@ -50,7 +86,7 @@ async function start() {
 
   // Graceful shutdown
   fastify.addHook('onClose', async () => {
-    db.close();
+    await pool.end();
   });
 
   // Start server

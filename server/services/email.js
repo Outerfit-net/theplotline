@@ -123,7 +123,7 @@ async function sendDailyEmail(email, dailyRun, unsubscribeToken) {
     </head>
     <body>
       <div class="container">
-        <img src="https://theplotline.net/logo-v4.png" alt="The Plot Line" style="height:70px;width:auto;display:block;margin:0 auto 20px;" />
+        <img src="${dailyRun.masthead_url || 'https://theplotline.net/logo-v4.png'}" alt="The Plot Line" style="width:100%;max-width:600px;height:auto;display:block;margin:0 auto 20px;border-radius:4px;" />
         <div class="meta">${dailyRun.run_date} | ${dailyRun.author_name || 'Hemingway'} style</div>
         <div class="meta" style="font-style: italic; color: #4a7c59; margin-top: 8px;">Season: ${dailyRun.author_season_name || ''}</div>
         <div class="weather">${dailyRun.weather_summary || ''}</div>

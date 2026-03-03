@@ -12,6 +12,26 @@ const { v4: uuidv4 } = require('uuid');
 const sessionTokens = new Map();
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+// Rate limiting for admin login
+const loginAttempts = new Map();
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const RATE_LIMIT_MAX_ATTEMPTS = 5; // 5 attempts per window
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const attempts = loginAttempts.get(ip) || [];
+  // Filter out old attempts
+  const recent = attempts.filter(t => now - t < RATE_LIMIT_WINDOW_MS);
+  
+  if (recent.length >= RATE_LIMIT_MAX_ATTEMPTS) {
+    return false; // Rate limited
+  }
+  
+  recent.push(now);
+  loginAttempts.set(ip, recent);
+  return true;
+}
+
 // Require ADMIN_SECRET to be configured
 function getAdminSecret() {
   const secret = process.env.ADMIN_SECRET;
@@ -129,6 +149,14 @@ async function adminRoutes(fastify) {
 
   // Auth check
   fastify.post('/admin/login', async (req, reply) => {
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    
+    // Rate limiting
+    if (!checkRateLimit(clientIp)) {
+      reply.code(429);
+      return { error: 'Too many attempts. Try again in 15 minutes.' };
+    }
+
     const { password } = req.body || {};
     const adminSecret = getAdminSecret();
     
@@ -139,6 +167,17 @@ async function adminRoutes(fastify) {
 
     const token = generateSessionToken();
     return { ok: true, token };
+  });
+
+  // Logout - invalidate token server-side
+  fastify.post('/admin/logout', async (req, reply) => {
+    const token = req.headers['x-admin-token'];
+    
+    if (token && sessionTokens.has(token)) {
+      sessionTokens.delete(token);
+    }
+    
+    return { ok: true };
   });
 
   // Stats endpoint
@@ -356,6 +395,69 @@ Any questions? Reply to this email or reach out to hello@theplotline.net`;
       reply.code(500);
       return { error: 'Failed to fetch beta invites' };
     }
+  });
+
+  // ── GET /api/admin/codestat ─────────────────────────────────────────────
+  fastify.get('/admin/codestat', async (req, reply) => {
+    const token = req.headers['x-admin-token'];
+    if (!token || !validateSessionToken(token)) {
+      reply.code(401);
+      return { error: 'Unauthorized' };
+    }
+
+    const fs = require('fs');
+    const path = require('path');
+    const ROOT = path.join(__dirname, '..', '..');
+
+    function countLines(filePath) {
+      try {
+        return fs.readFileSync(filePath, 'utf8').split('\n').length;
+      } catch { return 0; }
+    }
+
+    function walkDir(dir, exts, excludes = []) {
+      let files = [];
+      let entries;
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+      catch { return files; }
+
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (excludes.some(e => entry.name === e)) continue;
+          files = files.concat(walkDir(fullPath, exts, excludes));
+        } else if (exts.some(e => entry.name.endsWith(e))) {
+          files.push(fullPath);
+        }
+      }
+      return files;
+    }
+
+    const EXCLUDES = ['node_modules', 'dist', 'coverage', '.git'];
+    const EXTS = ['.js', '.jsx', '.py'];
+    const TEST_PATTERNS = ['__tests__', '.test.js', '.spec.js'];
+
+    const allFiles = walkDir(ROOT, EXTS, EXCLUDES);
+
+    const srcFiles = allFiles.filter(f => !TEST_PATTERNS.some(p => f.includes(p)));
+    const testFiles = allFiles.filter(f => TEST_PATTERNS.some(p => f.includes(p)));
+
+    const srcLines = srcFiles.reduce((sum, f) => sum + countLines(f), 0);
+    const testLines = testFiles.reduce((sum, f) => sum + countLines(f), 0);
+
+    // breakdown by type
+    const byType = {};
+    for (const f of srcFiles) {
+      const ext = path.extname(f).slice(1) || 'other';
+      byType[ext] = (byType[ext] || 0) + countLines(f);
+    }
+
+    return {
+      src: { files: srcFiles.length, lines: srcLines },
+      tests: { files: testFiles.length, lines: testLines },
+      ratio: srcLines > 0 ? Math.round((testLines / srcLines) * 100) / 100 : 0,
+      byType,
+    };
   });
 }
 
