@@ -19,7 +19,7 @@ MASTHEAD_DIR  = DATA_DIR / "mastheads"
 FONT_DIR = Path(os.environ.get("FONT_DIR", "/opt/plotlines/fonts/commercial"))
 FALLBACK_FONTS = Path("/usr/share/fonts/truetype/dejavu")
 
-WIDTH, HEIGHT = 600, 100
+WIDTH, HEIGHT = 700, 200
 
 TITLES = {
     ("spring","sunny"):  "The First Bloom",
@@ -112,7 +112,7 @@ def cache_key(station, author, season, weather):
     # station intentionally excluded — masthead is author+season+weather only
     return hashlib.md5(f"{author}:{season}:{weather}".encode()).hexdigest()
 
-def generate(station, author, season, weather, output_path=None):
+def generate(station, author, season, weather, output_path=None, art_layer=None):
     MASTHEAD_DIR.mkdir(parents=True, exist_ok=True)
     season, weather, author = season.lower(), weather.lower(), author.lower()
 
@@ -125,7 +125,19 @@ def generate(station, author, season, weather, output_path=None):
     title    = TITLES.get((season, weather), "Plot Lines")
     subtitle = f"theplotline.net  ·  {season.capitalize()}"
 
-    img  = Image.new("RGB", (WIDTH, HEIGHT), pal["bg"])
+    # If art layer provided and exists: use it as background
+    if art_layer and Path(art_layer).exists():
+        try:
+            img = Image.open(art_layer).convert("RGB")
+            if img.size != (WIDTH, HEIGHT):
+                img = img.resize((WIDTH, HEIGHT), resample=1)  # 1 = LANCZOS
+        except Exception:
+            # Fall back to solid color if art layer load fails
+            img = Image.new("RGB", (WIDTH, HEIGHT), pal["bg"])
+    else:
+        # Solid color background (original behavior)
+        img = Image.new("RGB", (WIDTH, HEIGHT), pal["bg"])
+    
     draw = ImageDraw.Draw(img)
 
     # Borders
@@ -167,15 +179,16 @@ if __name__ == "__main__":
     p.add_argument("season", choices=["spring","summer","fall","winter"])
     p.add_argument("weather", choices=["sunny","cloudy","rainy","snowy","frost","heat"])
     p.add_argument("--output")
+    p.add_argument("--art-layer", help="Path to art layer PNG (700x200)")
     p.add_argument("--batch", action="store_true", help="Generate all 24 combos for this station/author")
     args = p.parse_args()
 
     if args.batch:
         for s in ["spring","summer","fall","winter"]:
             for w in ["sunny","cloudy","rainy","snowy","frost","heat"]:
-                path = generate(args.station, args.author, s, w)
+                path = generate(args.station, args.author, s, w, art_layer=args.art_layer)
                 print(f"{s:8} {w:8} → {path}")
     else:
         out = generate(args.station, args.author, args.season, args.weather,
-                       Path(args.output) if args.output else None)
+                       Path(args.output) if args.output else None, art_layer=args.art_layer)
         print(out)
