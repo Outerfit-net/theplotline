@@ -109,7 +109,8 @@ def load_font(author, size):
     return ImageFont.load_default()
 
 def cache_key(station, author, season, weather):
-    return hashlib.md5(f"{station}:{author}:{season}:{weather}".encode()).hexdigest()
+    # station intentionally excluded — masthead is author+season+weather only
+    return hashlib.md5(f"{author}:{season}:{weather}".encode()).hexdigest()
 
 def generate(station, author, season, weather, output_path=None):
     MASTHEAD_DIR.mkdir(parents=True, exist_ok=True)
