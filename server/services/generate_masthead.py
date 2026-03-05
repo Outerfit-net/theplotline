@@ -36,7 +36,7 @@ SOLAR_TITLES = {
 
     # 2 · Rain Water (Feb 19)
     ("Rain Water", "sunny"):  "The Garden Drinks",
-    ("Rain Water", "cloudy"): "Rain Water",
+    ("Rain Water", "cloudy"): "The Sky Is Working",
     ("Rain Water", "rainy"):  "Notes from the Rain",
     ("Rain Water", "snowy"):  "Wet Snow",
     ("Rain Water", "frost"):  "The Last Hard Freeze",
@@ -69,7 +69,7 @@ SOLAR_TITLES = {
     # 6 · Grain Rain (Apr 20)
     ("Grain Rain", "sunny"):  "Warm Rain Coming",
     ("Grain Rain", "cloudy"): "The Coaxing",
-    ("Grain Rain", "rainy"):  "Grain Rain",
+    ("Grain Rain", "rainy"):  "Everything Drinking",
     ("Grain Rain", "snowy"):  "The Wet Surprise",
     ("Grain Rain", "frost"):  "Last Frost Watch",
     ("Grain Rain", "heat"):   "Dry Grain Rain",
@@ -110,9 +110,9 @@ SOLAR_TITLES = {
     ("Minor Heat", "sunny"):  "The Warmth Settles",
     ("Minor Heat", "cloudy"): "Heat & Cloud",
     ("Minor Heat", "rainy"):  "Monsoon Watch",
-    ("Minor Heat", "snowy"):  "Minor Heat",
-    ("Minor Heat", "frost"):  "Minor Heat",
-    ("Minor Heat", "heat"):   "Minor Heat",
+    ("Minor Heat", "snowy"):  "Cold Snap in July",
+    ("Minor Heat", "frost"):  "Summer Frost Warning",
+    ("Minor Heat", "heat"):   "The Slow Burn",
 
     # 12 · Major Heat (Jul 23)
     ("Major Heat", "sunny"):  "The Dry Spell Dispatch",
@@ -167,7 +167,7 @@ SOLAR_TITLES = {
     ("Frost's Descent", "cloudy"): "The Last Bloom",
     ("Frost's Descent", "rainy"):  "Notes from the Mud",
     ("Frost's Descent", "snowy"):  "The First Snow",
-    ("Frost's Descent", "frost"):  "Frost's Descent",
+    ("Frost's Descent", "frost"):  "The Garden Surrenders",
     ("Frost's Descent", "heat"):   "October Warmth",
 
     # 19 · Beginning of Winter (Nov 7)
@@ -182,7 +182,7 @@ SOLAR_TITLES = {
     ("Minor Snow", "sunny"):  "The Cold Frame",
     ("Minor Snow", "cloudy"): "The Dormant",
     ("Minor Snow", "rainy"):  "Sleet & Rain",
-    ("Minor Snow", "snowy"):  "Minor Snow",
+    ("Minor Snow", "snowy"):  "The First Real Snow",
     ("Minor Snow", "frost"):  "Killing Frost",
     ("Minor Snow", "heat"):   "Mild November",
 
@@ -190,7 +190,7 @@ SOLAR_TITLES = {
     ("Major Snow", "sunny"):  "Snow Days",
     ("Major Snow", "cloudy"): "The Dormant",
     ("Major Snow", "rainy"):  "Frost & Folly",
-    ("Major Snow", "snowy"):  "Major Snow",
+    ("Major Snow", "snowy"):  "Deep Cover",
     ("Major Snow", "frost"):  "Deep Freeze",
     ("Major Snow", "heat"):   "The Cold Frame",
 
@@ -198,7 +198,7 @@ SOLAR_TITLES = {
     ("Winter Solstice", "sunny"):  "The Shortest Day",
     ("Winter Solstice", "cloudy"): "Solstice Dark",
     ("Winter Solstice", "rainy"):  "Solstice Rain",
-    ("Winter Solstice", "snowy"):  "Winter Solstice",
+    ("Winter Solstice", "snowy"):  "The Long Dark",
     ("Winter Solstice", "frost"):  "Deep Winter",
     ("Winter Solstice", "heat"):   "The Cold Frame",
 
@@ -206,7 +206,7 @@ SOLAR_TITLES = {
     ("Minor Cold", "sunny"):  "Winter Plot",
     ("Minor Cold", "cloudy"): "The Dormant",
     ("Minor Cold", "rainy"):  "January Thaw",
-    ("Minor Cold", "snowy"):  "Minor Cold",
+    ("Minor Cold", "snowy"):  "The Cold Settles In",
     ("Minor Cold", "frost"):  "Hard Winter",
     ("Minor Cold", "heat"):   "The Cold Frame",
 
@@ -214,7 +214,7 @@ SOLAR_TITLES = {
     ("Major Cold", "sunny"):  "The Deep Still",
     ("Major Cold", "cloudy"): "The Dormant",
     ("Major Cold", "rainy"):  "Frost & Folly",
-    ("Major Cold", "snowy"):  "Major Cold",
+    ("Major Cold", "snowy"):  "Buried",
     ("Major Cold", "frost"):  "Deep Freeze",
     ("Major Cold", "heat"):   "Winter Plot",
 }
@@ -381,11 +381,20 @@ def generate(station, author, season, weather, output_path=None, art_layer=None,
     draw.line([(14, 22),(WIDTH-14, 22)], fill=pal["accent"], width=1)
     draw.line([(14, HEIGHT-23),(WIDTH-14, HEIGHT-23)], fill=pal["accent"], width=1)
 
-    tfont = load_font(author, 78)
     sfont = load_font(author, 13)
 
-    bbox = draw.textbbox((0,0), title, font=tfont)
-    tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
+    # Auto-fit title: start at 78px, shrink until text fits within (WIDTH - 48) px
+    MAX_TEXT_W = WIDTH - 48  # 24px padding each side
+    font_size = 78
+    tfont = load_font(author, font_size)
+    bbox = draw.textbbox((0, 0), title, font=tfont)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    while tw > MAX_TEXT_W and font_size > 20:
+        font_size -= 2
+        tfont = load_font(author, font_size)
+        bbox = draw.textbbox((0, 0), title, font=tfont)
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+
     tx = 24                                           # left-justified with padding
     ty = (HEIGHT - (bbox[3] + bbox[1])) // 2        # true vertical center
 
