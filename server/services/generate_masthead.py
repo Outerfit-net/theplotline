@@ -314,13 +314,13 @@ def cache_key(station, author, season, weather, solar_term=None):
         base += f":{solar_term}"
     return hashlib.md5(base.encode()).hexdigest()
 
-def generate(station, author, season, weather, output_path=None, art_layer=None, solar_term=None):
+def generate(station, author, season, weather, output_path=None, art_layer=None, solar_term=None, title_override=None):
     """
     Generate (or fetch from cache) a masthead PNG.
 
-    solar_term: optional str matching a key in SOLAR_TITLES, e.g. "Rain Water".
-                When provided the title and subtitle reflect the solar term rather
-                than just the coarse season bucket.
+    solar_term:     optional str matching a key in SOLAR_TITLES, e.g. "Rain Water".
+    title_override: if provided, skip all title lookup and use this string directly.
+                    This is the primary path when generate_title.py drives titles.
     """
     MASTHEAD_DIR.mkdir(parents=True, exist_ok=True)
     season, weather, author = season.lower(), weather.lower(), author.lower()
@@ -336,8 +336,11 @@ def generate(station, author, season, weather, output_path=None, art_layer=None,
         weather, {"bg":(240,245,220),"text":(50,80,40),"accent":(120,160,80)}
     )
 
-    # Title: solar term takes priority, then coarse season fallback
-    if solar_term_norm:
+    # Title: explicit override → solar term lookup → coarse season fallback
+    if title_override:
+        title    = title_override.strip()
+        subtitle = f"theplotline.net  ·  {solar_term_norm or season.capitalize()}"
+    elif solar_term_norm:
         title = (
             SOLAR_TITLES.get((solar_term_norm, weather))
             or SOLAR_TITLES.get((solar_term_norm, "sunny"))
@@ -412,19 +415,23 @@ if __name__ == "__main__":
     p.add_argument("--output")
     p.add_argument("--art-layer", help="Path to art layer PNG (700x200)")
     p.add_argument("--solar-term", help="Solar term name, e.g. 'Rain Water'. Overrides season-only title.")
+    p.add_argument("--title",  help="Override the title text (bypasses SOLAR_TITLES/TITLES lookup)")
     p.add_argument("--batch", action="store_true", help="Generate all 24 combos for this station/author")
     args = p.parse_args()
 
     solar_term = args.solar_term or None
 
+    title_override = args.title or None
+
     if args.batch:
         for s in ["spring","summer","fall","winter"]:
             for w in ["sunny","cloudy","rainy","snowy","frost","heat"]:
                 path = generate(args.station, args.author, s, w, art_layer=args.art_layer,
-                                solar_term=solar_term)
+                                solar_term=solar_term, title_override=title_override)
                 print(f"{s:8} {w:8} → {path}")
     else:
         out = generate(args.station, args.author, args.season, args.weather,
                        Path(args.output) if args.output else None,
-                       art_layer=args.art_layer, solar_term=solar_term)
+                       art_layer=args.art_layer, solar_term=solar_term,
+                       title_override=title_override)
         print(out)
