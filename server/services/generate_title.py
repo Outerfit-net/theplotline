@@ -207,7 +207,7 @@ def llm_title(solar_term=None, season=None, weather=None, region=None):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=12) as resp:
+        with urllib.request.urlopen(req, timeout=3) as resp:
             data = json.loads(resp.read())
             raw = data.get("response", "").strip()
             # Strip wrapping quotes if phi4 added them
