@@ -20,6 +20,57 @@ const MASTHEAD_DIR = path.join(__dirname, '..', '..', 'data', 'mastheads');
 const MASTHEAD_SCRIPT = path.join(__dirname, '..', 'services', 'generate_masthead.py');
 const APP_URL = process.env.APP_URL || 'https://theplotline.net';
 
+// ── Solar term lookup (matches garden_seasons.py exactly) ────────────────────
+// Returns the current solar term name for a given Date (defaults to today).
+const SOLAR_TERMS_JS = [
+  { month: 2,  day: 4,  name: 'Beginning of Spring' },
+  { month: 2,  day: 19, name: 'Rain Water'           },
+  { month: 3,  day: 6,  name: 'Awakening of Insects' },
+  { month: 3,  day: 21, name: 'Spring Equinox'       },
+  { month: 4,  day: 5,  name: 'Pure Brightness'      },
+  { month: 4,  day: 20, name: 'Grain Rain'           },
+  { month: 5,  day: 6,  name: 'Beginning of Summer'  },
+  { month: 5,  day: 21, name: 'Grain Buds'           },
+  { month: 6,  day: 6,  name: 'Grain in Ear'         },
+  { month: 6,  day: 21, name: 'Summer Solstice'      },
+  { month: 7,  day: 7,  name: 'Minor Heat'           },
+  { month: 7,  day: 23, name: 'Major Heat'           },
+  { month: 8,  day: 8,  name: 'Beginning of Autumn'  },
+  { month: 8,  day: 23, name: 'End of Heat'          },
+  { month: 9,  day: 8,  name: 'White Dew'            },
+  { month: 9,  day: 23, name: 'Autumn Equinox'       },
+  { month: 10, day: 8,  name: 'Cold Dew'             },
+  { month: 10, day: 23, name: "Frost's Descent"      },
+  { month: 11, day: 7,  name: 'Beginning of Winter'  },
+  { month: 11, day: 22, name: 'Minor Snow'           },
+  { month: 12, day: 7,  name: 'Major Snow'           },
+  { month: 12, day: 22, name: 'Winter Solstice'      },
+  { month: 1,  day: 6,  name: 'Minor Cold'           },
+  { month: 1,  day: 20, name: 'Major Cold'           },
+];
+
+function getCurrentSolarTerm(date = new Date()) {
+  const m = date.getMonth() + 1; // 1-indexed
+  const d = date.getDate();
+  // Walk backwards through terms to find the most recent one
+  // Build a flat list sorted by (month, day), handling Jan wrap
+  const sorted = [...SOLAR_TERMS_JS].sort((a, b) => {
+    const am = a.month === 1 ? 13 : a.month;
+    const bm = b.month === 1 ? 13 : b.month;
+    if (am !== bm) return am - bm;
+    return a.day - b.day;
+  });
+  const cm = m === 1 ? 13 : m;
+  let current = sorted[sorted.length - 1]; // default: last of year
+  for (const term of sorted) {
+    const tm = term.month === 1 ? 13 : term.month;
+    if (tm < cm || (tm === cm && term.day <= d)) {
+      current = term;
+    }
+  }
+  return current.name;
+}
+
 /**
  * Get or generate a masthead image for a combo + run.
  * Returns a public URL string, or null on failure.
@@ -29,8 +80,11 @@ async function getMasthead(combo, dailyRun) {
   const author = combo.author_key || 'hemingway';
   const season = (dailyRun.season || 'spring').toLowerCase();
   const weatherType = detectWeatherType(dailyRun.weather_summary || '');
+  const solarTerm = getCurrentSolarTerm();
 
-  const filename = `${station}-${author}-${season}-${weatherType}.png`;
+  // Include solar term in filename so caches per-term automatically
+  const termSlug = solarTerm.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const filename = `${station}-${author}-${season}-${weatherType}-${termSlug}.png`;
   const filepath = path.join(MASTHEAD_DIR, filename);
 
   // Return cached if exists
@@ -42,7 +96,8 @@ async function getMasthead(combo, dailyRun) {
   return new Promise((resolve) => {
     const proc = spawn('python3', [
       MASTHEAD_SCRIPT, station, author, season, weatherType,
-      '--output', filepath
+      '--output', filepath,
+      '--solar-term', solarTerm,
     ], { timeout: 15000 });
 
     proc.on('close', (code) => {

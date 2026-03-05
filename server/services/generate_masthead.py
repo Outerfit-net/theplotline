@@ -8,6 +8,7 @@ Usage:
     python3 generate_masthead.py <station> <author> <season> <weather> [--output /path/out.png]
     python3 generate_masthead.py BOU hemingway fall frost
     python3 generate_masthead.py BOU hemingway fall frost --batch
+    python3 generate_masthead.py BOU hemingway fall frost --solar-term "Rain Water"
 """
 
 import sys, os, hashlib
@@ -21,6 +22,204 @@ FALLBACK_FONTS = Path("/usr/share/fonts/truetype/dejavu")
 
 WIDTH, HEIGHT = 700, 200
 
+# ── Solar-term-aware titles ──────────────────────────────────────────────────
+# Keyed by (solar_term_name, weather).  These take priority over the coarse
+# season fallbacks below.  Weather keys: sunny, cloudy, rainy, snowy, frost, heat
+SOLAR_TITLES = {
+    # 1 · Beginning of Spring (Feb 4)
+    ("Beginning of Spring", "sunny"):  "The Loosening",
+    ("Beginning of Spring", "cloudy"): "First Stir",
+    ("Beginning of Spring", "rainy"):  "Mud Season Begins",
+    ("Beginning of Spring", "snowy"):  "Under the Snow",
+    ("Beginning of Spring", "frost"):  "Still Winter",
+    ("Beginning of Spring", "heat"):   "The Early Flush",
+
+    # 2 · Rain Water (Feb 19)
+    ("Rain Water", "sunny"):  "The Garden Drinks",
+    ("Rain Water", "cloudy"): "Rain Water",
+    ("Rain Water", "rainy"):  "Notes from the Rain",
+    ("Rain Water", "snowy"):  "Wet Snow",
+    ("Rain Water", "frost"):  "The Last Hard Freeze",
+    ("Rain Water", "heat"):   "The Garden Drinks",
+
+    # 3 · Awakening of Insects (Mar 6)
+    ("Awakening of Insects", "sunny"):  "The System Restarts",
+    ("Awakening of Insects", "cloudy"): "The Ground Turns",
+    ("Awakening of Insects", "rainy"):  "Rain & Worms",
+    ("Awakening of Insects", "snowy"):  "Late Cold",
+    ("Awakening of Insects", "frost"):  "Frost Before Thaw",
+    ("Awakening of Insects", "heat"):   "Early Awakening",
+
+    # 4 · Spring Equinox (Mar 21)
+    ("Spring Equinox", "sunny"):  "The Balance",
+    ("Spring Equinox", "cloudy"): "Mid-Sentence",
+    ("Spring Equinox", "rainy"):  "Becoming Everything",
+    ("Spring Equinox", "snowy"):  "Late March Snow",
+    ("Spring Equinox", "frost"):  "Equinox Frost",
+    ("Spring Equinox", "heat"):   "The Early Turn",
+
+    # 5 · Pure Brightness (Apr 5)
+    ("Pure Brightness", "sunny"):  "The World Clarifies",
+    ("Pure Brightness", "cloudy"): "Soft Light",
+    ("Pure Brightness", "rainy"):  "Petal Rain",
+    ("Pure Brightness", "snowy"):  "Late Blossom Snow",
+    ("Pure Brightness", "frost"):  "Cold Clarity",
+    ("Pure Brightness", "heat"):   "The Bright Heat",
+
+    # 6 · Grain Rain (Apr 20)
+    ("Grain Rain", "sunny"):  "Warm Rain Coming",
+    ("Grain Rain", "cloudy"): "The Coaxing",
+    ("Grain Rain", "rainy"):  "Grain Rain",
+    ("Grain Rain", "snowy"):  "The Wet Surprise",
+    ("Grain Rain", "frost"):  "Last Frost Watch",
+    ("Grain Rain", "heat"):   "Dry Grain Rain",
+
+    # 7 · Beginning of Summer (May 6)
+    ("Beginning of Summer", "sunny"):  "The Long Days Open",
+    ("Beginning of Summer", "cloudy"): "Summer's Eve",
+    ("Beginning of Summer", "rainy"):  "May Rain",
+    ("Beginning of Summer", "snowy"):  "Late Snow",
+    ("Beginning of Summer", "frost"):  "One More Frost",
+    ("Beginning of Summer", "heat"):   "The Heat Arrives",
+
+    # 8 · Grain Buds (May 21)
+    ("Grain Buds", "sunny"):  "Everything Swelling",
+    ("Grain Buds", "cloudy"): "Green on Green",
+    ("Grain Buds", "rainy"):  "The Swelling Rain",
+    ("Grain Buds", "snowy"):  "Late May Snow",
+    ("Grain Buds", "frost"):  "Grain Buds & Frost",
+    ("Grain Buds", "heat"):   "The Hot Flush",
+
+    # 9 · Grain in Ear (Jun 6)
+    ("Grain in Ear", "sunny"):  "Peak Green",
+    ("Grain in Ear", "cloudy"): "The Hum",
+    ("Grain in Ear", "rainy"):  "June Rain",
+    ("Grain in Ear", "snowy"):  "June Snow",
+    ("Grain in Ear", "frost"):  "Late Frost",
+    ("Grain in Ear", "heat"):   "The Climb Begins",
+
+    # 10 · Summer Solstice (Jun 21)
+    ("Summer Solstice", "sunny"):  "The Longest Day",
+    ("Summer Solstice", "cloudy"): "Solstice Cloud",
+    ("Summer Solstice", "rainy"):  "Solstice Rain",
+    ("Summer Solstice", "snowy"):  "Solstice",
+    ("Summer Solstice", "frost"):  "Solstice",
+    ("Summer Solstice", "heat"):   "The Summit",
+
+    # 11 · Minor Heat (Jul 7)
+    ("Minor Heat", "sunny"):  "The Warmth Settles",
+    ("Minor Heat", "cloudy"): "Heat & Cloud",
+    ("Minor Heat", "rainy"):  "Monsoon Watch",
+    ("Minor Heat", "snowy"):  "Minor Heat",
+    ("Minor Heat", "frost"):  "Minor Heat",
+    ("Minor Heat", "heat"):   "Minor Heat",
+
+    # 12 · Major Heat (Jul 23)
+    ("Major Heat", "sunny"):  "The Dry Spell Dispatch",
+    ("Major Heat", "cloudy"): "Midseason",
+    ("Major Heat", "rainy"):  "The Monsoon Letter",
+    ("Major Heat", "snowy"):  "High Summer",
+    ("Major Heat", "frost"):  "High Summer",
+    ("Major Heat", "heat"):   "The Furnace",
+
+    # 13 · Beginning of Autumn (Aug 7)
+    ("Beginning of Autumn", "sunny"):  "The Shift",
+    ("Beginning of Autumn", "cloudy"): "Autumn's Edge",
+    ("Beginning of Autumn", "rainy"):  "Monsoon's Last",
+    ("Beginning of Autumn", "snowy"):  "Early Autumn",
+    ("Beginning of Autumn", "frost"):  "First Chill",
+    ("Beginning of Autumn", "heat"):   "The Heat Holds",
+
+    # 14 · End of Heat (Aug 23)
+    ("End of Heat", "sunny"):  "The Turning",
+    ("End of Heat", "cloudy"): "The Cool Returns",
+    ("End of Heat", "rainy"):  "End of Monsoon",
+    ("End of Heat", "snowy"):  "Early September",
+    ("End of Heat", "frost"):  "First Frost Watch",
+    ("End of Heat", "heat"):   "Heat Lingers",
+
+    # 15 · White Dew (Sep 8)
+    ("White Dew", "sunny"):  "Dew on Every Surface",
+    ("White Dew", "cloudy"): "The Dew Line",
+    ("White Dew", "rainy"):  "Wet September",
+    ("White Dew", "snowy"):  "First Snow",
+    ("White Dew", "frost"):  "White Dew & Frost",
+    ("White Dew", "heat"):   "Dew & Heat",
+
+    # 16 · Autumn Equinox (Sep 23)
+    ("Autumn Equinox", "sunny"):  "Harvest Letter",
+    ("Autumn Equinox", "cloudy"): "The Equinox",
+    ("Autumn Equinox", "rainy"):  "Autumn Rain",
+    ("Autumn Equinox", "snowy"):  "The Frost Line",
+    ("Autumn Equinox", "frost"):  "Equinox Frost",
+    ("Autumn Equinox", "heat"):   "Warm September",
+
+    # 17 · Cold Dew (Oct 8)
+    ("Cold Dew", "sunny"):  "The Last Gold",
+    ("Cold Dew", "cloudy"): "October",
+    ("Cold Dew", "rainy"):  "Cold Rain",
+    ("Cold Dew", "snowy"):  "The Frost Line",
+    ("Cold Dew", "frost"):  "Cold Dew & Frost",
+    ("Cold Dew", "heat"):   "The Burn",
+
+    # 18 · Frost's Descent (Oct 23)
+    ("Frost's Descent", "sunny"):  "Frost Descends",
+    ("Frost's Descent", "cloudy"): "The Last Bloom",
+    ("Frost's Descent", "rainy"):  "Notes from the Mud",
+    ("Frost's Descent", "snowy"):  "The First Snow",
+    ("Frost's Descent", "frost"):  "Frost's Descent",
+    ("Frost's Descent", "heat"):   "October Warmth",
+
+    # 19 · Beginning of Winter (Nov 7)
+    ("Beginning of Winter", "sunny"):  "The Garden Quiets",
+    ("Beginning of Winter", "cloudy"): "Winter's Edge",
+    ("Beginning of Winter", "rainy"):  "The Long Rain",
+    ("Beginning of Winter", "snowy"):  "First Cover",
+    ("Beginning of Winter", "frost"):  "Hard Frost",
+    ("Beginning of Winter", "heat"):   "Indian Summer",
+
+    # 20 · Minor Snow (Nov 22)
+    ("Minor Snow", "sunny"):  "The Cold Frame",
+    ("Minor Snow", "cloudy"): "The Dormant",
+    ("Minor Snow", "rainy"):  "Sleet & Rain",
+    ("Minor Snow", "snowy"):  "Minor Snow",
+    ("Minor Snow", "frost"):  "Killing Frost",
+    ("Minor Snow", "heat"):   "Mild November",
+
+    # 21 · Major Snow (Dec 7)
+    ("Major Snow", "sunny"):  "Snow Days",
+    ("Major Snow", "cloudy"): "The Dormant",
+    ("Major Snow", "rainy"):  "Frost & Folly",
+    ("Major Snow", "snowy"):  "Major Snow",
+    ("Major Snow", "frost"):  "Deep Freeze",
+    ("Major Snow", "heat"):   "The Cold Frame",
+
+    # 22 · Winter Solstice (Dec 22)
+    ("Winter Solstice", "sunny"):  "The Shortest Day",
+    ("Winter Solstice", "cloudy"): "Solstice Dark",
+    ("Winter Solstice", "rainy"):  "Solstice Rain",
+    ("Winter Solstice", "snowy"):  "Winter Solstice",
+    ("Winter Solstice", "frost"):  "Deep Winter",
+    ("Winter Solstice", "heat"):   "The Cold Frame",
+
+    # 23 · Minor Cold (Jan 6)
+    ("Minor Cold", "sunny"):  "Winter Plot",
+    ("Minor Cold", "cloudy"): "The Dormant",
+    ("Minor Cold", "rainy"):  "January Thaw",
+    ("Minor Cold", "snowy"):  "Minor Cold",
+    ("Minor Cold", "frost"):  "Hard Winter",
+    ("Minor Cold", "heat"):   "The Cold Frame",
+
+    # 24 · Major Cold (Jan 20)
+    ("Major Cold", "sunny"):  "The Deep Still",
+    ("Major Cold", "cloudy"): "The Dormant",
+    ("Major Cold", "rainy"):  "Frost & Folly",
+    ("Major Cold", "snowy"):  "Major Cold",
+    ("Major Cold", "frost"):  "Deep Freeze",
+    ("Major Cold", "heat"):   "Winter Plot",
+}
+
+# ── Coarse-season fallbacks (used when no solar term is provided) ─────────────
 TITLES = {
     ("spring","sunny"):  "The First Bloom",
     ("spring","cloudy"): "Sprout Notes",
@@ -108,39 +307,63 @@ def load_font(author, size):
             return ImageFont.truetype(str(p), size)
     return ImageFont.load_default()
 
-def cache_key(station, author, season, weather):
-    # station intentionally excluded — masthead is author+season+weather only
-    return hashlib.md5(f"{author}:{season}:{weather}".encode()).hexdigest()
+def cache_key(station, author, season, weather, solar_term=None):
+    # station intentionally excluded — masthead is author+season+weather+(solar_term) only
+    base = f"{author}:{season}:{weather}"
+    if solar_term:
+        base += f":{solar_term}"
+    return hashlib.md5(base.encode()).hexdigest()
 
-def generate(station, author, season, weather, output_path=None, art_layer=None):
+def generate(station, author, season, weather, output_path=None, art_layer=None, solar_term=None):
+    """
+    Generate (or fetch from cache) a masthead PNG.
+
+    solar_term: optional str matching a key in SOLAR_TITLES, e.g. "Rain Water".
+                When provided the title and subtitle reflect the solar term rather
+                than just the coarse season bucket.
+    """
     MASTHEAD_DIR.mkdir(parents=True, exist_ok=True)
     season, weather, author = season.lower(), weather.lower(), author.lower()
+    # Normalise solar_term capitalisation for lookup
+    solar_term_norm = solar_term.strip() if solar_term else None
 
-    key  = cache_key(station, author, season, weather)
+    key  = cache_key(station, author, season, weather, solar_term_norm)
     out  = output_path or (MASTHEAD_DIR / f"{key}.png")
     if out.exists() and not output_path:
         return out  # cache hit
 
-    pal      = PALETTES.get(season, PALETTES["spring"]).get(weather, {"bg":(240,245,220),"text":(50,80,40),"accent":(120,160,80)})
-    title    = TITLES.get((season, weather), "Plot Lines")
-    subtitle = f"theplotline.net  ·  {season.capitalize()}"
+    pal = PALETTES.get(season, PALETTES["spring"]).get(
+        weather, {"bg":(240,245,220),"text":(50,80,40),"accent":(120,160,80)}
+    )
 
-    # If art layer provided and exists: use it as background
+    # Title: solar term takes priority, then coarse season fallback
+    if solar_term_norm:
+        title = (
+            SOLAR_TITLES.get((solar_term_norm, weather))
+            or SOLAR_TITLES.get((solar_term_norm, "sunny"))
+            or TITLES.get((season, weather), "Plot Lines")
+        )
+        subtitle = f"theplotline.net  ·  {solar_term_norm}"
+    else:
+        title    = TITLES.get((season, weather), "Plot Lines")
+        subtitle = f"theplotline.net  ·  {season.capitalize()}"
+
+    # If art layer provided and exists: full bleed background
+    ART_SPLIT = 0
     if art_layer and Path(art_layer).exists():
         try:
-            img = Image.open(art_layer).convert("RGB")
-            if img.size != (WIDTH, HEIGHT):
-                img = img.resize((WIDTH, HEIGHT), resample=1)  # 1 = LANCZOS
+            art = Image.open(art_layer).convert("RGB")
+            if art.size != (WIDTH, HEIGHT):
+                art = art.resize((WIDTH, HEIGHT), resample=Image.LANCZOS)
+            img = art
         except Exception:
-            # Fall back to solid color if art layer load fails
             img = Image.new("RGB", (WIDTH, HEIGHT), pal["bg"])
     else:
-        # Solid color background (original behavior)
         img = Image.new("RGB", (WIDTH, HEIGHT), pal["bg"])
     
     draw = ImageDraw.Draw(img)
 
-    # Borders
+    # Borders (full image)
     draw.rectangle([0,0,WIDTH-1,HEIGHT-1], outline=pal["accent"], width=2)
     draw.rectangle([4,4,WIDTH-5,HEIGHT-5], outline=pal["accent"], width=1)
 
@@ -150,23 +373,31 @@ def generate(station, author, season, weather, output_path=None, art_layer=None)
         draw.line([(cx,cy-4),(cx,cy+4)], fill=pal["accent"], width=1)
 
     # Rules
-    draw.line([(14,22),(WIDTH-14,22)], fill=pal["accent"], width=1)
-    draw.line([(14,HEIGHT-23),(WIDTH-14,HEIGHT-23)], fill=pal["accent"], width=1)
+    draw.line([(14, 22),(WIDTH-14, 22)], fill=pal["accent"], width=1)
+    draw.line([(14, HEIGHT-23),(WIDTH-14, HEIGHT-23)], fill=pal["accent"], width=1)
 
-    # Title
-    tfont = load_font(author, 36)
-    sfont = load_font(author, 11)
+    tfont = load_font(author, 72)
+    sfont = load_font(author, 13)
 
     bbox = draw.textbbox((0,0), title, font=tfont)
     tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
-    tx = (WIDTH - tw) // 2
-    ty = (HEIGHT - th) // 2 - 8
-    draw.text((tx, ty), title, font=tfont, fill=pal["text"])
+    tx = 24                                          # left-justified with padding
+    ty = (HEIGHT - (bbox[3] + bbox[1])) // 2        # true vertical center
 
-    # Subtitle
+    # Title: dark stroke + white fill
+    stroke_color = (40, 25, 10)
+    for ox, oy in [(-2,-2),(0,-2),(2,-2),(-2,0),(2,0),(-2,2),(0,2),(2,2)]:
+        draw.text((tx+ox, ty+oy), title, font=tfont, fill=stroke_color)
+    draw.text((tx, ty), title, font=tfont, fill=(255, 255, 255))
+
+    # Subtitle: bottom-right, stroke + white
     sbbox = draw.textbbox((0,0), subtitle, font=sfont)
-    sx = (WIDTH - (sbbox[2]-sbbox[0])) // 2
-    draw.text((sx, ty+th+5), subtitle, font=sfont, fill=pal["accent"])
+    sw = sbbox[2] - sbbox[0]
+    sx = WIDTH - sw - 18
+    sy = HEIGHT - 20
+    for ox, oy in [(-1,-1),(0,-1),(1,-1),(-1,0),(1,0),(-1,1),(0,1),(1,1)]:
+        draw.text((sx+ox, sy+oy), subtitle, font=sfont, fill=stroke_color)
+    draw.text((sx, sy), subtitle, font=sfont, fill=(255, 255, 255))
 
     img.save(str(out), "PNG", optimize=True)
     return out
@@ -180,15 +411,20 @@ if __name__ == "__main__":
     p.add_argument("weather", choices=["sunny","cloudy","rainy","snowy","frost","heat"])
     p.add_argument("--output")
     p.add_argument("--art-layer", help="Path to art layer PNG (700x200)")
+    p.add_argument("--solar-term", help="Solar term name, e.g. 'Rain Water'. Overrides season-only title.")
     p.add_argument("--batch", action="store_true", help="Generate all 24 combos for this station/author")
     args = p.parse_args()
+
+    solar_term = args.solar_term or None
 
     if args.batch:
         for s in ["spring","summer","fall","winter"]:
             for w in ["sunny","cloudy","rainy","snowy","frost","heat"]:
-                path = generate(args.station, args.author, s, w, art_layer=args.art_layer)
+                path = generate(args.station, args.author, s, w, art_layer=args.art_layer,
+                                solar_term=solar_term)
                 print(f"{s:8} {w:8} → {path}")
     else:
         out = generate(args.station, args.author, args.season, args.weather,
-                       Path(args.output) if args.output else None, art_layer=args.art_layer)
+                       Path(args.output) if args.output else None,
+                       art_layer=args.art_layer, solar_term=solar_term)
         print(out)
