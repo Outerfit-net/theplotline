@@ -307,11 +307,13 @@ def load_font(author, size):
             return ImageFont.truetype(str(p), size)
     return ImageFont.load_default()
 
-def cache_key(station, author, season, weather, solar_term=None):
-    # station intentionally excluded — masthead is author+season+weather+(solar_term) only
+def cache_key(station, author, season, weather, solar_term=None, art_layer=None):
+    # station intentionally excluded — masthead is author+season+weather+(solar_term)+(art_layer) only
     base = f"{author}:{season}:{weather}"
     if solar_term:
         base += f":{solar_term}"
+    if art_layer:
+        base += f":{art_layer}"
     return hashlib.md5(base.encode()).hexdigest()
 
 def generate(station, author, season, weather, output_path=None, art_layer=None, solar_term=None, title_override=None):
@@ -327,7 +329,7 @@ def generate(station, author, season, weather, output_path=None, art_layer=None,
     # Normalise solar_term capitalisation for lookup
     solar_term_norm = solar_term.strip() if solar_term else None
 
-    key  = cache_key(station, author, season, weather, solar_term_norm)
+    key  = cache_key(station, author, season, weather, solar_term_norm, art_layer)
     out  = output_path or (MASTHEAD_DIR / f"{key}.png")
     if out.exists() and not output_path:
         return out  # cache hit
