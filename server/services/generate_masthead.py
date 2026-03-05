@@ -381,7 +381,7 @@ def generate(station, author, season, weather, output_path=None, art_layer=None,
     draw.line([(14, 22),(WIDTH-14, 22)], fill=pal["accent"], width=1)
     draw.line([(14, HEIGHT-23),(WIDTH-14, HEIGHT-23)], fill=pal["accent"], width=1)
 
-    tfont = load_font(author, 26)
+    tfont = load_font(author, 78)
     sfont = load_font(author, 13)
 
     bbox = draw.textbbox((0,0), title, font=tfont)
