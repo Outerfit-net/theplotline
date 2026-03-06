@@ -15,6 +15,7 @@ const { sendDailyEmail } = require('../services/email');
 const { getSeasonName } = require('../services/seasonNames');
 const { detectWeatherType } = require('../services/weather');
 const { getSubRegion, getSubRegionFlavor } = require('../services/sub-regions');
+// encKey is loaded lazily inside runDispatch so it's available after dotenv loads
 
 const MASTHEAD_DIR = path.join(__dirname, '..', '..', 'data', 'mastheads');
 const MASTHEAD_SCRIPT = path.join(__dirname, '..', 'services', 'generate_masthead.py');
@@ -376,9 +377,10 @@ async function runDispatch(db) {
 
         console.log(`[dispatch] Generated in ${generationMs}ms: ${combo.location_key}/${combo.author_key}`);
 
-        // Get subscribers for this combination
+        // Get subscribers for this combination (lat/lon stay plaintext for geo math)
+        const { encKey } = require('../services/db-crypto'); // lazy require: env must be loaded before this runs
         const subscribers = await db.prepare(`
-          SELECT id, email, unsubscribe_token
+          SELECT id, pgp_sym_decrypt(email_enc, ?)::text AS email, unsubscribe_token
           FROM subscribers
           WHERE author_key = ?
             AND (
@@ -387,7 +389,7 @@ async function runDispatch(db) {
                ROUND(lon * 20) / 20 = ROUND(?) / 20)
             )
             AND active = 1 AND confirmed_at IS NOT NULL
-        `).all(combo.author_key, combo.station_code, combo.lat, combo.lon);
+        `).all(encKey, combo.author_key, combo.station_code, combo.lat, combo.lon);
 
         console.log(`[dispatch] Sending to ${subscribers.length} subscribers`);
 

@@ -1,6 +1,30 @@
 # THE GARDEN — Architecture & Business Plan
 
 *Last Updated: 2026-03-06*
+
+---
+
+## Backups
+
+**Script:** `/opt/plotlines/ops/backup-db.sh`
+**Schedule:** Daily at 02:00 UTC via cron
+**Destination:** Cloudflare R2 via rclone — `outerfit-backups:outerfit-llc/`
+**Contents:**
+- `plotlines/plotlines_YYYYMMDD_HHMMSS.sql.gz` — full PostgreSQL dump
+- `thread/thread_YYYYMMDD_HHMMSS.sql.gz` — thread DB dump
+**Retention:** Last 7 days locally in `/tmp/`, R2 keeps all
+**rclone remote:** `outerfit-backups` (S3-compatible, Cloudflare R2)
+**Log:** `/opt/plotlines/logs/backup.log`
+
+**Restore:**
+```bash
+rclone ls outerfit-backups:outerfit-llc/plotlines/   # list backups
+rclone copy outerfit-backups:outerfit-llc/plotlines/plotlines_YYYYMMDD_HHMMSS.sql.gz /tmp/
+gunzip /tmp/plotlines_YYYYMMDD_HHMMSS.sql.gz
+PGPASSWORD=plines2026 psql -h localhost -U plotlines plotlines < /tmp/plotlines_YYYYMMDD_HHMMSS.sql
+```
+
+⚠️ **Security note:** Database is NOT encrypted at rest (plain ext4/LVM). Backups in R2 are compressed but not encrypted. Full disk encryption (LUKS) is planned before public launch.
 *Infrastructure: Shared with Outerfit LLC (outerfit.net VPS)*
 
 ---

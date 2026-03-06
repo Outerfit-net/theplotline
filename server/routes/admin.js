@@ -5,6 +5,7 @@
 
 const crypto = require('crypto');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' });
+const { encKey } = require('../services/db-crypto');
 const { sendEmail } = require('../services/email');
 const { v4: uuidv4 } = require('uuid');
 
@@ -232,12 +233,14 @@ async function adminRoutes(fastify) {
       `).all();
 
       const recentSubs = await db.prepare(`
-        SELECT email, location_city, location_country, climate_zone_id, created_at, subscribed_at
+        SELECT pgp_sym_decrypt(email_enc, ?)::text AS email,
+               pgp_sym_decrypt(location_city_enc, ?)::text AS location_city,
+               location_country, climate_zone_id, created_at, subscribed_at
         FROM subscribers
         WHERE active=1 AND (subscription_status IS NULL OR subscription_status != 'canceled')
         ORDER BY subscribed_at DESC
         LIMIT 10
-      `).all();
+      `).all(encKey, encKey);
 
       return {
         subscribers: { total: totalSubscribers, confirmed, active, newToday },

@@ -8,6 +8,7 @@ const { v4: uuidv4 } = require('uuid');
 const { sendEmail } = require('../services/email');
 const { geocodeWithRetry: geocode } = require('../services/geocode');
 const { assignClimateZone } = require('../services/climate');
+const { encKey } = require('../services/db-crypto');
 
 // Helper to HTML-escape strings for XSS prevention
 function htmlEscape(str) {
@@ -33,11 +34,16 @@ async function stripeRoutes(fastify) {
     try {
       const subscriber = await db.prepare(`
         SELECT
-          id, email, plan, subscription_status, subscription_end_date, stripe_subscription_id
+          id,
+          pgp_sym_decrypt(email_enc, ?)::text AS email,
+          pgp_sym_decrypt(location_city_enc, ?)::text AS location_city,
+          pgp_sym_decrypt(location_state_enc, ?)::text AS location_state,
+          pgp_sym_decrypt(zipcode_enc, ?)::text AS zipcode,
+          plan, subscription_status, subscription_end_date, stripe_subscription_id
         FROM subscribers
-        WHERE email = ? AND management_token = ?
+        WHERE email_enc = pgp_sym_encrypt(?::text, ?) AND management_token = ?
         LIMIT 1
-      `).get(email, token);
+      `).get(encKey, encKey, encKey, encKey, email, encKey, token);
 
       if (!subscriber) {
         return reply.code(401).send({ error: 'Invalid email or token' });
@@ -72,11 +78,13 @@ async function stripeRoutes(fastify) {
     try {
       const subscriber = await db.prepare(`
         SELECT
-          id, email, stripe_subscription_id, subscription_end_date
+          id,
+          pgp_sym_decrypt(email_enc, ?)::text AS email,
+          stripe_subscription_id, subscription_end_date
         FROM subscribers
-        WHERE email = ? AND management_token = ?
+        WHERE email_enc = pgp_sym_encrypt(?::text, ?) AND management_token = ?
         LIMIT 1
-      `).get(email, token);
+      `).get(encKey, email, encKey, token);
 
       if (!subscriber) {
         return reply.code(401).send({ error: 'Invalid email or token' });
@@ -125,10 +133,10 @@ async function stripeRoutes(fastify) {
     const db = fastify.db;
     try {
       const subscriber = await db.prepare(`
-        SELECT id, email, plan FROM subscribers
-        WHERE email = ? AND management_token = ?
+        SELECT id, pgp_sym_decrypt(email_enc, ?)::text AS email, plan FROM subscribers
+        WHERE email_enc = pgp_sym_encrypt(?::text, ?) AND management_token = ?
         LIMIT 1
-      `).get(email, token);
+      `).get(encKey, email, encKey, token);
 
       if (!subscriber) {
         return reply.code(401).send({ error: 'Invalid email or token' });
@@ -185,10 +193,10 @@ async function stripeRoutes(fastify) {
     try {
       // Verify gifter
       const gifter = await db.prepare(`
-        SELECT id, email, subscription_status FROM subscribers
-        WHERE email = ? AND management_token = ?
+        SELECT id, pgp_sym_decrypt(email_enc, ?)::text AS email, subscription_status FROM subscribers
+        WHERE email_enc = pgp_sym_encrypt(?::text, ?) AND management_token = ?
         LIMIT 1
-      `).get(gifterEmail, gifterToken);
+      `).get(encKey, gifterEmail, encKey, gifterToken);
 
       if (!gifter) {
         return reply.code(401).send({ error: 'Invalid gifter email or token' });
@@ -346,7 +354,7 @@ If you're not interested, you can ignore this email.
       // Look up subscriber by email if no subscriberId provided
       let resolvedSubscriberId = subscriberId;
       if (!resolvedSubscriberId) {
-        const sub = await db.prepare('SELECT id FROM subscribers WHERE email = ? LIMIT 1').get(email);
+        const sub = await db.prepare('SELECT id FROM subscribers WHERE email_enc = pgp_sym_encrypt(?::text, ?) LIMIT 1').get(email, encKey);
         if (sub) {
           resolvedSubscriberId = sub.id;
         }
@@ -498,14 +506,14 @@ If you're not interested, you can ignore this email.
             // ── Backfill zipcode + re-geocode from Stripe billing address if not provided ──
             const postalCode = session.customer_details?.address?.postal_code;
             if (postalCode) {
-              const existing = await db.prepare('SELECT zipcode, lat, lon FROM subscribers WHERE id = ?').get(subscriberId);
+              const existing = await db.prepare('SELECT pgp_sym_decrypt(zipcode_enc, ?)::text AS zipcode, lat, lon FROM subscribers WHERE id = ?').get(encKey, subscriberId);
               const needsZip = !existing?.zipcode;
               const needsGeo = !existing?.lat;
 
               if (needsZip || needsGeo) {
                 await db.prepare(`
-                  UPDATE subscribers SET zipcode = COALESCE(NULLIF(zipcode,''), ?) WHERE id = ?
-                `).run(postalCode, subscriberId);
+                  UPDATE subscribers SET zipcode_enc = pgp_sym_encrypt(COALESCE(NULLIF(pgp_sym_decrypt(zipcode_enc, ?)::text,''), ?), ?) WHERE id = ?
+                `).run(encKey, postalCode, encKey, subscriberId);
 
                 // Re-geocode using zipcode for precision
                 try {
@@ -513,8 +521,11 @@ If you're not interested, you can ignore this email.
                   if (geo) {
                     const zoneId = assignClimateZone(geo.lat, geo.lon, 'US');
                     await db.prepare(`
-                      UPDATE subscribers SET lat = ?, lon = ?, climate_zone_id = ? WHERE id = ?
-                    `).run(geo.lat, geo.lon, zoneId, subscriberId);
+                      UPDATE subscribers SET lat = ?, lon = ?,
+                        lat_enc = pgp_sym_encrypt(?::text, ?),
+                        lon_enc = pgp_sym_encrypt(?::text, ?),
+                        climate_zone_id = ? WHERE id = ?
+                    `).run(geo.lat, geo.lon, String(geo.lat), encKey, String(geo.lon), encKey, zoneId, subscriberId);
                     fastify.log.info(`[webhook] geocoded zip ${postalCode} → ${geo.lat},${geo.lon} zone=${zoneId} for ${subscriberId}`);
                   }
                 } catch (geoErr) {
@@ -621,9 +632,9 @@ If you're not interested, you can ignore this email.
     try {
       const subscriber = await db.prepare(`
         SELECT id FROM subscribers
-        WHERE email = ? AND management_token = ?
+        WHERE email_enc = pgp_sym_encrypt(?::text, ?) AND management_token = ?
         LIMIT 1
-      `).get(email, token);
+      `).get(email, encKey, token);
 
       if (!subscriber) {
         return reply.code(401).send({ error: 'Invalid email or token' });
@@ -638,20 +649,20 @@ If you're not interested, you can ignore this email.
         params.push(author);
       }
       if (city !== undefined) {
-        updates.push('location_city = ?');
-        params.push(city);
+        updates.push('location_city_enc = pgp_sym_encrypt(?::text, ?)');
+        params.push(city, encKey);
       }
       if (state !== undefined) {
-        updates.push('location_state = ?');
-        params.push(state);
+        updates.push('location_state_enc = pgp_sym_encrypt(?::text, ?)');
+        params.push(state, encKey);
       }
       if (country !== undefined) {
         updates.push('location_country = ?');
         params.push(country);
       }
       if (zipcode !== undefined) {
-        updates.push('zipcode = ?');
-        params.push(zipcode);
+        updates.push('zipcode_enc = pgp_sym_encrypt(?::text, ?)');
+        params.push(zipcode, encKey);
       }
 
       if (updates.length > 0) {
