@@ -219,7 +219,8 @@ async function adminRoutes(fastify) {
       const confirmed = (await db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE active=1 AND confirmed_at IS NOT NULL AND (subscription_status IS NULL OR subscription_status != \'canceled\')').get()).n;
       const active = (await db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE active=1 AND confirmed_at IS NOT NULL AND (subscription_status IS NULL OR subscription_status != \'canceled\')').get()).n;
       const today = new Date().toISOString().slice(0,10);
-      const newToday = (await db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE active=1 AND date(created_at)=? AND (subscription_status IS NULL OR subscription_status != \'canceled\')').get(today)).n;
+      // Use subscribed_at (updated on reactivation) not created_at (immutable original signup)
+      const newToday = (await db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE active=1 AND date(subscribed_at)=? AND (subscription_status IS NULL OR subscription_status != \'canceled\')').get(today)).n;
 
       const byZone = await db.prepare(`
         SELECT climate_zone_id, COUNT(*) as n
@@ -230,10 +231,10 @@ async function adminRoutes(fastify) {
       `).all();
 
       const recentSubs = await db.prepare(`
-        SELECT email, location_city, location_country, climate_zone_id, created_at
+        SELECT email, location_city, location_country, climate_zone_id, created_at, subscribed_at
         FROM subscribers
         WHERE active=1 AND (subscription_status IS NULL OR subscription_status != 'canceled')
-        ORDER BY created_at DESC
+        ORDER BY subscribed_at DESC
         LIMIT 10
       `).all();
 

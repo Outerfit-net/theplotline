@@ -132,7 +132,8 @@ async function subscriberRoutes(fastify) {
             UPDATE subscribers SET active=1, unsubscribed_at=NULL,
               confirm_token=?, unsubscribe_token=?, management_token=?,
               auth_token_expires_at=NOW() + INTERVAL '1 year',
-              location_city=?, location_state=?, location_country=?, author_key=?, zipcode=?
+              location_city=?, location_state=?, location_country=?, author_key=?, zipcode=?,
+              subscribed_at=NOW()
             WHERE id=?
           `).run(confirmToken, unsubscribeToken, uuidv4(), city, state || '', country, author, zipcode || '', existing.id);
           await sendConfirmationEmail(email, confirmToken);
@@ -286,7 +287,7 @@ async function subscriberRoutes(fastify) {
       }
 
       await db.prepare(
-        "UPDATE subscribers SET confirmed_at=NOW(), confirm_token=NULL WHERE id=?"
+        "UPDATE subscribers SET confirmed_at=NOW(), subscribed_at=NOW(), confirm_token=NULL WHERE id=?"
       ).run(subscriber.id);
 
       return reply.redirect(`${clientUrl}?confirmed=true&email=${encodeURIComponent(subscriber.email)}`);

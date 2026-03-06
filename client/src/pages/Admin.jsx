@@ -312,7 +312,7 @@ export default function Admin() {
                   <td className="px-4 py-2">{s.email}</td>
                   <td className="px-4 py-2">{s.location_city && s.location_country ? `${s.location_city}, ${s.location_country}` : '—'}</td>
                   <td className="px-4 py-2">{s.climate_zone_id || '—'}</td>
-                  <td className="px-4 py-2 text-[var(--color-text-muted)]">{s.created_at?.slice(0,10)}</td>
+                  <td className="px-4 py-2 text-[var(--color-text-muted)]" title={`Originally joined: ${s.created_at?.slice(0,10)}`}>{(s.subscribed_at || s.created_at)?.slice(0,10)}</td>
                 </tr>
               ))}
             </tbody>
