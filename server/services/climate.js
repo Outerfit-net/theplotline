@@ -27,12 +27,12 @@ const ZONE_RULES = [
   {
     id: 'south_africa_subtropical',
     test: (lat, lon, country) =>
-      country === 'ZA' && lat > -26,
+      country === 'ZA' && lat >= -32 && lat <= -26,
   },
   {
     id: 'south_africa_temperate',
     test: (lat, lon, country) =>
-      country === 'ZA' && lat <= -26,
+      country === 'ZA' && lat < -30,
   },
 
   // ── UK & IRELAND ──────────────────────────────────────────────────────────
@@ -89,121 +89,117 @@ const ZONE_RULES = [
   },
 
   // ── UNITED STATES ─────────────────────────────────────────────────────────
-  // ALASKA (split: interior + coastal)
+  
+  // DESERT SOUTHWEST (Phoenix, Tucson, Las Vegas, El Paso, West Texas)
   {
-    id: 'alaska_interior',
+    id: 'desert_southwest',
     test: (lat, lon, country) =>
-      country === 'US' && lat >= 62 && lat <= 66 && lon >= -165 && lon <= -141,
-  },
-  {
-    id: 'alaska_south_coastal',
-    test: (lat, lon, country) =>
-      country === 'US' && lat >= 58 && lat <= 62 && lon >= -150 && lon <= -130,
+      country === 'US' && lat >= 29 && lat <= 37 && lon >= -117 && lon <= -104,
   },
 
-  // PACIFIC COAST
+  // PACIFIC COAST (before desert to catch Seattle/Portland)
   {
     id: 'pacific_maritime',
     test: (lat, lon, country) =>
       country === 'US' && lon <= -116 && lat >= 42 && lat <= 50,
   },
 
-  // CALIFORNIA
+  // CALIFORNIA (northern/central CA - must come AFTER desert_southwest)
   {
     id: 'california_med',
     test: (lat, lon, country) =>
       country === 'US' && lon <= -114 && lat >= 32 && lat <= 42,
   },
 
-  // INTERMOUNTAIN & HIGH PLAINS
-  {
-    id: 'high_plains',
-    test: (lat, lon, country) =>
-      country === 'US' && lat >= 31 && lat <= 49 && lon >= -116 && lon <= -102,
-  },
-
-  // DESERT SOUTHWEST (new — separated from high_plains)
-  {
-    id: 'desert_southwest',
-    test: (lat, lon, country) =>
-      country === 'US' && lat >= 31 && lat <= 40 && lon >= -114 && lon <= -109,
-  },
-
-  // GREAT PLAINS (redefined — no overlap with high_plains)
-  {
-    id: 'great_plains',
-    test: (lat, lon, country) =>
-      country === 'US' && lat >= 32 && lat <= 48 && lon >= -102 && lon <= -95,
-  },
-
-  // GREAT LAKES (new — split from upper_midwest)
-  {
-    id: 'great_lakes',
-    test: (lat, lon, country) =>
-      country === 'US' && lat >= 41 && lat <= 46 && lon >= -90 && lon <= -82,
-  },
-
-  // UPPER MIDWEST CONTINENTAL (redefined — narrower, no Great Lakes)
-  {
-    id: 'upper_midwest_continental',
-    test: (lat, lon, country) =>
-      country === 'US' && lat >= 41 && lat <= 49 && lon >= -99 && lon <= -89,
-  },
-
-  // APPALACHIAN / MID-ATLANTIC
-  {
-    id: 'appalachian',
-    test: (lat, lon, country) =>
-      country === 'US' && lat >= 35 && lat <= 42 && lon >= -85 && lon <= -78,
-  },
-
-  // NORTHEAST
-  {
-    id: 'northeast',
-    test: (lat, lon, country) =>
-      country === 'US' && lat >= 40 && lat <= 47 && lon >= -75 && lon <= -66,
-  },
-
-  // HUMID SUBTROPICAL (redefined — excludes South Florida)
-  {
-    id: 'humid_subtropical',
-    test: (lat, lon, country) =>
-      country === 'US' && lat >= 25 && lat <= 36 && lon >= -90 && lon <= -75,
-  },
-
-  // SOUTHERN PLAINS / RIO GRANDE (new)
-  {
-    id: 'southern_plains',
-    test: (lat, lon, country) =>
-      country === 'US' && lat >= 25 && lat <= 31 && lon >= -100 && lon <= -95,
-  },
-
-  // FLORIDA SOUTHERN TROPICAL (new — wet/dry seasons)
-  {
-    id: 'florida_southern',
-    test: (lat, lon, country) =>
-      country === 'US' && lat >= 24 && lat <= 28 && lon >= -82 && lon <= -80,
-  },
-
-  // FLORIDA KEYS TROPICAL (new — frost-free, trade winds)
-  {
-    id: 'florida_keys_tropical',
-    test: (lat, lon, country) =>
-      country === 'US' && lat >= 24 && lat <= 25.5 && lon >= -82 && lon <= -80.5,
-  },
-
-  // HAWAII (new — trade winds, tropical)
+  // HAWAII (before catch-all)
   {
     id: 'hawaii',
     test: (lat, lon, country) =>
       country === 'US' && lat >= 19 && lat <= 23 && lon >= -160 && lon <= -155,
   },
 
-  // CATCH-ALL (should rarely be needed)
+  // FLORIDA KEYS TROPICAL (before florida_southern)
+  {
+    id: 'florida_keys_tropical',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 24.3 && lat <= 25.5 && lon >= -82 && lon <= -80,
+  },
+
+  // FLORIDA SOUTHERN (northern FL - Tampa/Jacksonville area)
+  {
+    id: 'florida_southern',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 25 && lat <= 30 && lon >= -88 && lon <= -80,
+  },
+
+  // GREAT LAKES (Cleveland, Detroit, Marquette, Duluth, Green Bay) - lon extended to -93 for Duluth
+  {
+    id: 'great_lakes',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 41 && lat <= 48 && lon >= -93 && lon <= -80,
+  },
+
+  // UPPER MIDWEST CONTINENTAL (Minneapolis, Chicago, Milwaukee)
+  {
+    id: 'upper_midwest_continental',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 41 && lat <= 49 && lon >= -97 && lon <= -84,
+  },
+
+  // APPALACHIAN (mountains - Asheville, Roanoke, Pittsburgh, Knoxville) - must come BEFORE humid_subtropical
+  {
+    id: 'appalachian',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 35 && lat <= 42 && lon >= -85 && lon <= -76,
+  },
+
+  // HUMID SUBTROPICAL (Gulf Coast + Piedmont + Southeast)
+  {
+    id: 'humid_subtropical',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 25 && lat <= 36 && lon >= -97 && lon <= -75,
+  },
+
+  // SOUTHERN PLAINS (South Texas - San Antonio, Austin, McAllen)
+  {
+    id: 'southern_plains',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 25 && lat <= 32 && lon >= -100 && lon <= -97,
+  },
+
+  // NORTHEAST
+  {
+    id: 'northeast',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 40 && lat <= 47 && lon >= -80 && lon <= -66,
+  },
+
+  // HIGH PLAINS (Intermountain West - must come before great_plains)
+  {
+    id: 'high_plains',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 32 && lat <= 49 && lon >= -117 && lon <= -102,
+  },
+
+  // GREAT PLAANS (central US catch-all - after upper_midwest_continental)
   {
     id: 'great_plains',
     test: (lat, lon, country) =>
-      country === 'US',
+      country === 'US' && lat >= 29 && lat <= 48 && lon >= -103 && lon <= -89,
+  },
+
+  // ALASKA: Interior (far north - Fairbanks, Barrow) - lat >= 64 (north of Alaska Range)
+  {
+    id: 'alaska_interior',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 64,
+  },
+
+  // ALASKA: South Coastal (Anchorage, Juneau, Ketchikan) - lat 54-64, coastal lon
+  {
+    id: 'alaska_south_coastal',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 54 && lat < 64 && lon > -170 && lon <= -130,
   },
 ];
 
