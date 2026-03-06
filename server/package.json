@@ -8,7 +8,7 @@
     "dev": "node --watch index.js",
     "db:init": "node db/init.js",
     "db:seed": "node db/seed.js",
-    "test": "NODE_ENV=test jest"
+    "test": "NODE_ENV=test jest --runInBand"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
