@@ -46,6 +46,10 @@ const KNOWN_CORRECT = [
   { name: 'Boston MA',          lat: 42.3601,  lon: -71.0589,  country: 'US', expectedZone: 'northeast' },
   { name: 'Chicago IL',         lat: 41.8781,  lon: -87.6298,  country: 'US', expectedZone: 'upper_midwest' },
   { name: 'Minneapolis MN',     lat: 44.9778,  lon: -93.2650,  country: 'US', expectedZone: 'upper_midwest' },
+  // Appalachian
+  { name: 'Asheville NC',       lat: 35.5951,  lon: -82.5515,  country: 'US', expectedZone: 'appalachian' },
+  { name: 'Roanoke VA',         lat: 37.2710,  lon: -79.9414,  country: 'US', expectedZone: 'appalachian' },
+  { name: 'Charleston WV',      lat: 38.3498,  lon: -81.6326,  country: 'US', expectedZone: 'appalachian' },
   // South
   { name: 'Phoenix AZ',         lat: 33.4484,  lon: -112.0740, country: 'US', expectedZone: 'high_plains' },
   { name: 'Houston TX',         lat: 29.7604,  lon: -95.3698,  country: 'US', expectedZone: 'humid_southeast' },
