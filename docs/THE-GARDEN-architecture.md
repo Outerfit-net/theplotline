@@ -24,8 +24,19 @@ gunzip /tmp/plotlines_YYYYMMDD_HHMMSS.sql.gz
 PGPASSWORD=plines2026 psql -h localhost -U plotlines plotlines < /tmp/plotlines_YYYYMMDD_HHMMSS.sql
 ```
 
-⚠️ **Security note:** Database is NOT encrypted at rest (plain ext4/LVM). Backups in R2 are compressed but not encrypted. Full disk encryption (LUKS) is planned before public launch.
-*Infrastructure: Shared with Outerfit LLC (outerfit.net VPS)*
+**Security:** Backups are GPG-encrypted before upload (key: `backup@theplotline.net`, private key in Bitwarden "PlotLines Backup GPG Key"). Only `.gpg` files are stored in R2 — unreadable without the private key.
+
+**Restore (encrypted):**
+```bash
+# Get private key from Bitwarden, import it
+bw get notes "PlotLines Backup GPG Key" | gpg --import
+
+# Download and decrypt
+rclone copy outerfit-backups:outerfit-llc/plotlines/plotlines_DATE.sql.gz.gpg /tmp/
+gpg --decrypt /tmp/plotlines_DATE.sql.gz.gpg | gunzip | PGPASSWORD=plines2026 psql -h localhost -U plotlines plotlines
+```
+
+⚠️ **Disk encryption:** Database volume is NOT encrypted at rest (plain ext4/LVM). LUKS full-disk encryption is planned before public launch.
 
 ---
 
@@ -185,13 +196,40 @@ For each active location+author combo:
   1. Run Python engine → prose_text, prose_html, topic, quote, weather_summary
   2. Store result in daily_runs table
   3. Get author-voiced season name (micro_seasons table)
-  4. Generate (or load cached) masthead PNG
-     → station-author-season-weather.png in /data/mastheads/
-     → served at https://theplotline.net/mastheads/<file>.png
-  5. For each active confirmed subscriber in that combo:
+  4. Generate newsletter title via generate_title.py (mistral:latest, 30s timeout)
+     → 2-3 word poetic title e.g. "Snow's Serenade for Buzzing Blooms"
+     → Falls back to static TITLE_DICT[solar_term, weather] on Ollama failure
+  5. Generate masthead PNG (two-step, lazy-cached):
+     a. generate_art.py (zone, weather) → SD 1.5 botanical art layer (700x200, ~6s)
+        → cached in /data/mastheads/art/flux/<hash>.png
+     b. generate_masthead.py (station, author, season, weather, --art-layer, --solar-term, --title)
+        → PIL composites title + solar term text over art layer
+        → cached as station-author-season-weather-term.png in /data/mastheads/
+        → served at https://theplotline.net/mastheads/<file>.png
+  6. For each active confirmed subscriber in that combo:
      → sendDailyEmail() with masthead_url + prose + footer links
      → Record delivery in deliveries table
 ```
+
+**Weather type normalization** (`server/services/weather.js → detectWeatherType()`):
+Valid types: `sunny`, `cloudy`, `rainy`, `snowy`, `frost`, `heat`
+NWS descriptions like `partly_cloudy`, `foggy`, `stormy` are normalized to valid types.
+Default fallback: `cloudy` (never passes invalid type to masthead script).
+
+**Title generation** (`server/services/generate_title.py`):
+- Model: `mistral:latest` via Ollama (localhost:11434)
+- Timeout: 30s
+- Fallback: static `TITLE_DICT[(solar_term, weather)]` lookup
+- Static fallback of last resort: `"Patience"`
+- ⚠️ Was broken 2026-03-06: timeout was 3s (always fell back), phi4 was too slow.
+  Fixed: switched to mistral, bumped timeout to 30s.
+
+**Art generation** (`skills/garden-conversation/generate_art.py`):
+- Model: SD 1.5 (`runwayml/stable-diffusion-v1-5`) via diffusers
+- ~6s generation, 700x200px, flat botanical illustration style
+- Prompt built from zone + weather + solar term
+- ⚠️ Was not wired into dispatch until 2026-03-06 — every masthead was text-only solid color.
+  Fixed: dispatch now runs generate_art.py first, passes result as --art-layer.
 
 **Email footer links** (all use `email+token` for auth):
 - Manage subscription → `/manage?email=&token=`
@@ -230,6 +268,31 @@ This ensures subscribers who skip the optional zip field still get correctly zon
 - Beta codes (`BETA-*`) bypass payment during checkout
 - Used for early access, press, friends & family
 - Tracked in `beta_invite` field on subscriber
+
+### Security & Privacy
+
+**Email encryption at rest (pgcrypto):**
+- `subscribers.email` is stored as BYTEA encrypted with `pgp_sym_encrypt(email, DB_ENCRYPTION_KEY)`
+- `subscribers.email_hash` is a SHA-256 hex hash of `lower(trim(email))` — used for deduplication lookups
+- `DB_ENCRYPTION_KEY` lives in `.env` (gitignored) and Bitwarden "PlotLines DB Encryption Key"
+- ⚠️ KEY LOSS = PERMANENT DATA LOSS. Back up before any server migration.
+- Location fields (`lat`, `lon`, `zipcode`, `location_city`, `location_state`) also encrypted at rest
+- Privacy statement on `/about` page reflects this accurately
+
+**Backup encryption:**
+- All R2 backups GPG-encrypted before upload (`backup@theplotline.net` key)
+- Private key in Bitwarden "PlotLines Backup GPG Key"
+- Old unencrypted backups purged from R2 on 2026-03-06
+
+**What is NOT encrypted:**
+- Disk at rest (plain ext4/LVM) — LUKS planned pre-launch
+- `climate_zone_id`, `station_code`, `author_key`, `active`, timestamps — non-PII, plaintext for query performance
+
+**Privacy statement** (`/about` page):
+> Emails encrypted at rest with AES-256, never stored in plaintext.
+> Location data also encrypted at rest.
+> Backups GPG-encrypted before leaving our servers.
+> Never shared, sold, or rented.
 
 ### Location & Climate Zone Resolution
 
@@ -668,6 +731,36 @@ Adding Joan Didion, Wendell Berry, Thoreau, Steinbeck, or Toni Morrison as autho
 Each new author voice is a marketing event.
 
 ---
+
+## Test Coverage
+
+**Run tests:** `cd /opt/plotlines/server && npm test`
+**Current:** 9 suites, ~160 tests, 0 failures
+
+**Test philosophy:** Tests must use real coordinates and real assertions.
+Never hardcode math like `(33791/33791)*100 > 85` — that tests nothing.
+Never reuse the same lat/lon for multiple zip codes.
+
+| Suite | What it tests |
+|-------|--------------|
+| `location-outliers.test.js` | Extreme locations: Key West, Juneau, Barrow, international cities |
+| `zip-coverage.test.js` | Real lat/lon per zip — Mountain West, Pacific, South, Northeast, AK, FL |
+| `geocoding.test.js` | Key West coords correct, Juneau coords correct |
+| `webhook.test.js` | Stripe zipcode backfill — 4 combinations (needsZip × needsGeo) |
+| `admin.test.js` | Admin auth, KPI queries, international subscriber dispatch |
+| `climate.test.js` | Zone assignment rules, boundary conditions |
+
+**Known gaps (test.todo):**
+- Hawaii (no climate zone defined)
+- Puerto Rico, Guam (territories)
+- Japan, Brazil, South Africa, Iceland (international gaps)
+
+**What good tests caught (2026-03-06):**
+- Key West resolving to `high_plains` (wrong Boulder coords in DB)
+- Juneau having no zone (missing SE Alaska bounding box)
+- `partly_cloudy` being an invalid masthead weather type
+- Art layer never being passed to masthead compositor
+- Title generation always returning "Patience" (3s timeout, wrong model)
 
 ## Shared Infrastructure Checklist
 
