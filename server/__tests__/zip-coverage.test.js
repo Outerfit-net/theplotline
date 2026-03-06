@@ -46,6 +46,8 @@ const KNOWN_CORRECT = [
   { name: 'Boston MA',          lat: 42.3601,  lon: -71.0589,  country: 'US', expectedZone: 'northeast' },
   { name: 'Chicago IL',         lat: 41.8781,  lon: -87.6298,  country: 'US', expectedZone: 'upper_midwest' },
   { name: 'Minneapolis MN',     lat: 44.9778,  lon: -93.2650,  country: 'US', expectedZone: 'upper_midwest' },
+  { name: 'Marquette MI (UP)',  lat: 46.5436,  lon: -87.3954,  country: 'US', expectedZone: 'upper_midwest' }, // ⚠️ UP Michigan is zone 4a — much colder than Chicago (5b). upper_midwest is too coarse here. TODO: split great_lakes zone.
+  { name: 'Duluth MN',         lat: 46.7867,  lon: -92.1005,  country: 'US', expectedZone: 'upper_midwest' }, // ⚠️ Same issue — lake effect, brutal winters, needs finer zone
   // Appalachian
   { name: 'Asheville NC',       lat: 35.5951,  lon: -82.5515,  country: 'US', expectedZone: 'appalachian' },
   { name: 'Roanoke VA',         lat: 37.2710,  lon: -79.9414,  country: 'US', expectedZone: 'appalachian' },
