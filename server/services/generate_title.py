@@ -144,7 +144,7 @@ GENERIC_POOL = [
 ]
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "phi4:14b"  # pull: `ollama pull phi4:14b` — falls back to static if unavailable
+MODEL = "mistral:latest"  # reliable, fast — falls back to static if unavailable
 
 
 def static_title(solar_term=None, season=None, weather=None):
@@ -207,13 +207,14 @@ def llm_title(solar_term=None, season=None, weather=None, region=None):
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=3) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read())
             raw = data.get("response", "").strip()
             # Strip wrapping quotes if phi4 added them
             raw = raw.strip('"\'')
-            # Take only the first line
-            title = raw.splitlines()[0].strip().rstrip(".,;:")
+            # Take only the first line — guard against empty response
+            lines = [l.strip().rstrip(".,;:") for l in raw.splitlines() if l.strip()]
+            title = lines[0] if lines else None
             return title if title else None
     except Exception as e:
         print(f"[generate_title] Ollama unavailable: {e}", file=sys.stderr)
