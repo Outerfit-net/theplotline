@@ -147,7 +147,11 @@ async function subscriberRoutes(fastify) {
       // ── Resolve location ──────────────────────────────────────────────────
       let lat = null, lon = null, stationCode = null, timezone = null;
 
-      // Prefer zipcode for geocoding if provided
+      // Prefer zipcode for geocoding if provided (most precise for US locations)
+      // Fallback: if state is present, use "city, state" format
+      // Final fallback: "city, country" for non-US locations (Nominatim handles via countrycodes param)
+      // The geocode service detects 5-digit zips and uses postal code search for precision,
+      // and for international queries uses the countrycodes parameter to narrow results by country.
       const locationQuery = (zipcode && country.toUpperCase() === 'US')
         ? zipcode
         : state ? `${city}, ${state}` : `${city}, ${country}`;
