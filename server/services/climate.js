@@ -90,11 +90,11 @@ const ZONE_RULES = [
 
   // ── UNITED STATES ─────────────────────────────────────────────────────────
   
-  // DESERT SOUTHWEST (Phoenix, Tucson, Las Vegas, El Paso, West Texas)
+  // DESERT SOUTHWEST (Phoenix, Tucson, Las Vegas, El Paso) - lat 31-37, lon -117 to -106
   {
     id: 'desert_southwest',
     test: (lat, lon, country) =>
-      country === 'US' && lat >= 29 && lat <= 37 && lon >= -117 && lon <= -104,
+      country === 'US' && lat >= 31 && lat <= 37 && lon >= -117 && lon <= -106,
   },
 
   // PACIFIC COAST (before desert to catch Seattle/Portland)

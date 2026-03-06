@@ -18,11 +18,11 @@ const FL_ZIPS = [
 ];
 
 const AK_ZIPS = [
-  { zip: '99501', city: 'Anchorage AK',          lat: 61.2181, lon: -149.9003, expectedZone: 'alaska' },
-  { zip: '99801', city: 'Juneau AK',             lat: 58.3020, lon: -134.4197, expectedZone: 'alaska' },
-  { zip: '99705', city: 'North Pole AK',         lat: 64.7511, lon: -147.3494, expectedZone: 'alaska' },
-  { zip: '99723', city: 'Barrow AK',             lat: 71.2906, lon: -156.7887, expectedZone: 'alaska' },
-  { zip: '99553', city: 'Akutan AK (Aleutians)', lat: 54.1355, lon: -165.7739, expectedZone: 'alaska' },
+  { zip: '99501', city: 'Anchorage AK',          lat: 61.2181, lon: -149.9003, expectedZone: 'alaska_south_coastal' },
+  { zip: '99801', city: 'Juneau AK',             lat: 58.3020, lon: -134.4197, expectedZone: 'alaska_south_coastal' },
+  { zip: '99705', city: 'North Pole AK',         lat: 64.7511, lon: -147.3494, expectedZone: 'alaska_interior' },
+  { zip: '99723', city: 'Barrow AK',             lat: 71.2906, lon: -156.7887, expectedZone: 'alaska_interior' },
+  { zip: '99553', city: 'Akutan AK (Aleutians)', lat: 54.1355, lon: -165.7739, expectedZone: 'alaska_south_coastal' },
 ];
 
 const KNOWN_CORRECT = [
@@ -31,7 +31,7 @@ const KNOWN_CORRECT = [
   { name: 'Denver CO',          lat: 39.7392,  lon: -104.9903, country: 'US', expectedZone: 'high_plains' },
   { name: 'Colorado Springs CO',lat: 38.8339,  lon: -104.8214, country: 'US', expectedZone: 'high_plains' },
   { name: 'Santa Fe NM',        lat: 35.6870,  lon: -105.9378, country: 'US', expectedZone: 'high_plains' },
-  { name: 'Albuquerque NM',     lat: 35.0844,  lon: -106.6504, country: 'US', expectedZone: 'high_plains' },
+  { name: 'Albuquerque NM',     lat: 35.0844,  lon: -106.6504, country: 'US', expectedZone: 'desert_southwest' },
   { name: 'Salt Lake City UT',  lat: 40.7608,  lon: -111.8910, country: 'US', expectedZone: 'high_plains' },
   { name: 'Bozeman MT',         lat: 45.6770,  lon: -111.0429, country: 'US', expectedZone: 'high_plains' },
   { name: 'Cheyenne WY',        lat: 41.1400,  lon: -104.8202, country: 'US', expectedZone: 'high_plains' },
@@ -40,22 +40,22 @@ const KNOWN_CORRECT = [
   { name: 'Seattle WA',         lat: 47.6062,  lon: -122.3321, country: 'US', expectedZone: 'pacific_maritime' },
   { name: 'Portland OR',        lat: 45.5051,  lon: -122.6750, country: 'US', expectedZone: 'pacific_maritime' },
   { name: 'Los Angeles CA',     lat: 34.0522,  lon: -118.2437, country: 'US', expectedZone: 'california_med' },
-  { name: 'San Francisco CA',   lat: 37.7749,  lon: -122.4194, country: 'US', expectedZone: 'pacific_maritime' }, // SF is maritime (lat 37.77 >= 37 boundary)
+  { name: 'San Francisco CA', lat: 37.7749, lon: -122.4194, country: 'US', expectedZone: 'california_med' },, // SF is maritime (lat 37.77 >= 37 boundary)
   // Northeast / Midwest
   { name: 'New York NY',        lat: 40.7128,  lon: -74.0060,  country: 'US', expectedZone: 'northeast' },
   { name: 'Boston MA',          lat: 42.3601,  lon: -71.0589,  country: 'US', expectedZone: 'northeast' },
-  { name: 'Chicago IL',         lat: 41.8781,  lon: -87.6298,  country: 'US', expectedZone: 'upper_midwest' },
-  { name: 'Minneapolis MN',     lat: 44.9778,  lon: -93.2650,  country: 'US', expectedZone: 'upper_midwest' },
-  { name: 'Marquette MI (UP)',  lat: 46.5436,  lon: -87.3954,  country: 'US', expectedZone: 'upper_midwest' }, // ⚠️ UP Michigan is zone 4a — much colder than Chicago (5b). upper_midwest is too coarse here. TODO: split great_lakes zone.
-  { name: 'Duluth MN',         lat: 46.7867,  lon: -92.1005,  country: 'US', expectedZone: 'upper_midwest' }, // ⚠️ Same issue — lake effect, brutal winters, needs finer zone
+  { name: 'Chicago IL',         lat: 41.8781,  lon: -87.6298,  country: 'US', expectedZone: 'great_lakes' },
+  { name: 'Minneapolis MN',     lat: 44.9778,  lon: -93.2650,  country: 'US', expectedZone: 'upper_midwest_continental' },
+  { name: 'Marquette MI (UP)',  lat: 46.5436,  lon: -87.3954,  country: 'US', expectedZone: 'great_lakes' }, // UP Michigan - lake effect
+  { name: 'Duluth MN',         lat: 46.7867,  lon: -92.1005,  country: 'US', expectedZone: 'great_lakes' }, // Lake effect
   // Appalachian
   { name: 'Asheville NC',       lat: 35.5951,  lon: -82.5515,  country: 'US', expectedZone: 'appalachian' },
   { name: 'Roanoke VA',         lat: 37.2710,  lon: -79.9414,  country: 'US', expectedZone: 'appalachian' },
   { name: 'Charleston WV',      lat: 38.3498,  lon: -81.6326,  country: 'US', expectedZone: 'appalachian' },
   // South
-  { name: 'Phoenix AZ',         lat: 33.4484,  lon: -112.0740, country: 'US', expectedZone: 'high_plains' },
-  { name: 'Houston TX',         lat: 29.7604,  lon: -95.3698,  country: 'US', expectedZone: 'humid_southeast' },
-  { name: 'Atlanta GA',         lat: 33.7490,  lon: -84.3880,  country: 'US', expectedZone: 'humid_southeast' },
+  { name: 'Phoenix AZ', lat: 33.4484, lon: -112.0740, country: 'US', expectedZone: 'desert_southwest' },,
+  { name: 'Houston TX',         lat: 29.7604,  lon: -95.3698,  country: 'US', expectedZone: 'humid_subtropical' },
+  { name: 'Atlanta GA',         lat: 33.7490,  lon: -84.3880,  country: 'US', expectedZone: 'humid_subtropical' },
   // International
   { name: 'London UK',          lat: 51.5074,  lon: -0.1278,   country: 'GB', expectedZone: 'uk_maritime' },
   { name: 'Berlin DE',          lat: 52.5200,  lon: 13.4050,   country: 'DE', expectedZone: 'central_europe' },

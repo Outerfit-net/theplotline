@@ -19,18 +19,18 @@ const { getSubRegion } = require('../services/sub-regions');
 
 const TEST_LOCATIONS = [
   // ── US extremes ────────────────────────────────────────────────────────────
-  { name: 'Key West FL',    lat: 24.5548,   lon: -81.8021,  country: 'US', expectedZone: 'humid_southeast' },
-  { name: 'Juneau AK',      lat: 58.3020,   lon: -134.4197, country: 'US', expectedZone: 'alaska' },
-  { name: 'Utqiagvik AK',   lat: 71.2906,   lon: -156.7887, country: 'US', expectedZone: 'alaska' },
-  { name: 'Anchorage AK',   lat: 61.2181,   lon: -149.9003, country: 'US', expectedZone: 'alaska' },
-  { name: 'Honolulu HI',    lat: 21.3069,   lon: -157.8583, country: 'US', expectedZone: null },   // known gap: Hawaii has no climate zone
-  { name: 'El Paso TX',     lat: 31.7619,   lon: -106.4850, country: 'US', expectedZone: 'high_plains' },
-  { name: 'Miami FL',       lat: 25.7617,   lon: -80.1918,  country: 'US', expectedZone: 'humid_southeast' },
+  { name: 'Key West FL',    lat: 24.5548,   lon: -81.8021,  country: 'US', expectedZone: 'florida_keys_tropical' },
+  { name: 'Juneau AK',      lat: 58.3020,   lon: -134.4197, country: 'US', expectedZone: 'alaska_south_coastal' },
+  { name: 'Utqiagvik AK',   lat: 71.2906,   lon: -156.7887, country: 'US', expectedZone: 'alaska_interior' },
+  { name: 'Anchorage AK',   lat: 61.2181,   lon: -149.9003, country: 'US', expectedZone: 'alaska_south_coastal' },
+  { name: 'Honolulu HI',    lat: 21.3069,   lon: -157.8583, country: 'US', expectedZone: 'hawaii' },   // known gap: Hawaii has no climate zone
+  { name: 'El Paso TX',     lat: 31.7619,   lon: -106.4850, country: 'US', expectedZone: 'desert_southwest' },
+  { name: 'Miami FL',       lat: 25.7617,   lon: -80.1918,  country: 'US', expectedZone: 'florida_southern' },
   { name: 'Caribou ME',     lat: 46.8611,   lon: -68.0117,  country: 'US', expectedZone: 'northeast' },
-  { name: 'Brownsville TX', lat: 25.9017,   lon: -97.4975,  country: 'US', expectedZone: 'humid_southeast' },
+  { name: 'Brownsville TX', lat: 25.9017,   lon: -97.4975,  country: 'US', expectedZone: 'southern_plains' },
   { name: 'San Diego CA',   lat: 32.7157,   lon: -117.1611, country: 'US', expectedZone: 'california_med' },
-  { name: 'Intl Falls MN',  lat: 48.5997,   lon: -93.4088,  country: 'US', expectedZone: 'upper_midwest' },
-  { name: 'Phoenix AZ',     lat: 33.4484,   lon: -112.0740, country: 'US', expectedZone: 'high_plains' },
+  { name: 'Intl Falls MN',  lat: 48.5997,   lon: -93.4088,  country: 'US', expectedZone: 'upper_midwest_continental' },
+  { name: 'Phoenix AZ',     lat: 33.4484,   lon: -112.0740, country: 'US', expectedZone: 'desert_southwest' },
   { name: 'Boulder CO',     lat: 40.0150,   lon: -105.2705, country: 'US', expectedZone: 'high_plains' },
   { name: 'Seattle WA',     lat: 47.6062,   lon: -122.3321, country: 'US', expectedZone: 'pacific_maritime' },
   { name: 'New York NY',    lat: 40.7128,   lon: -74.0060,  country: 'US', expectedZone: 'northeast' },

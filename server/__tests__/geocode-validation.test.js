@@ -9,16 +9,16 @@ const { assignClimateZone } = require('../services/climate');
 describe('Geocoding: Location validation', () => {
   /**
    * Key West, FL coordinates: lat 24.5548, lon -81.8021
-   * Should be in humid_southeast zone
+   * Should be in florida_keys_tropical zone
    */
-  test('Key West, FL (24.5548, -81.8021) → humid_southeast', () => {
+  test('Key West, FL (24.5548, -81.8021) → florida_keys_tropical', () => {
     const lat = 24.5548;
     const lon = -81.8021;
     const zone = assignClimateZone(lat, lon, 'US');
     
-    expect(zone).toBe('humid_southeast');
+    expect(zone).toBe('florida_keys_tropical');
     
-    // Verify reasoning: lat < 37 and lon >= -100 → humid_southeast
+    // Verify reasoning: lat < 37 and lon >= -100 → florida_keys_tropical
     expect(lat < 37).toBe(true);
     expect(lon >= -100).toBe(true);
   });
@@ -32,7 +32,7 @@ describe('Geocoding: Location validation', () => {
     const lon = -134.4197;
     const zone = assignClimateZone(lat, lon, 'US');
     
-    expect(zone).toBe('alaska');
+    expect(zone).toBe('alaska_south_coastal');
     
     // Verify reasoning: lat >= 54 → alaska (catches all of AK including Southeast)
     expect(lat >= 54).toBe(true);
@@ -41,46 +41,44 @@ describe('Geocoding: Location validation', () => {
   /**
    * Test Alaska rule catches entire state including Southeast
    */
-  test('Alaska rule catches all latitudes >= 54', () => {
+  test('Alaska zones: south_coastal vs interior', () => {
     const testCases = [
-      { lat: 54.0, lon: -130.0, desc: 'Southern AK boundary' },
-      { lat: 58.3, lon: -134.4, desc: 'Juneau (Southeast)' },
-      { lat: 64.0, lon: -152.0, desc: 'Central AK' },
-      { lat: 70.0, lon: -150.0, desc: 'Northern AK' },
+      { lat: 54.0, lon: -130.0, desc: 'Southern AK', expected: 'alaska_south_coastal' },
+      { lat: 58.3, lon: -134.4, desc: 'Juneau', expected: 'alaska_south_coastal' },
+      { lat: 64.0, lon: -152.0, desc: 'Central AK', expected: 'alaska_interior' },
+      { lat: 70.0, lon: -150.0, desc: 'Northern AK', expected: 'alaska_interior' },
     ];
-
-    testCases.forEach(({ lat, lon, desc }) => {
-      const zone = assignClimateZone(lat, lon, 'US');
-      expect(zone).toBe('alaska', `Failed for ${desc}`);
+    testCases.forEach(({ lat, lon, desc, expected }) => {
+      expect(assignClimateZone(lat, lon, 'US')).toBe(expected, `Failed for ${desc}`);
     });
+  });
   });
 
   /**
-   * Verify humid_southeast rule applies correctly to Florida peninsula
+   * Verify florida_keys_tropical rule applies correctly to Florida peninsula
    */
-  test('Florida locations match humid_southeast rule', () => {
+  test('Florida locations match florida_keys_tropical rule', () => {
     const floridaLocs = [
-      { lat: 25.7614, lon: -80.1938, name: 'Miami' },
-      { lat: 24.5548, lon: -81.8021, name: 'Key West' },
-      { lat: 27.9506, lon: -82.4572, name: 'Tampa' },
-      { lat: 28.5383, lon: -81.3792, name: 'Orlando' },
+      { lat: 25.7614, lon: -80.1938, name: 'Miami', expected: 'florida_southern' },
+      { lat: 24.5548, lon: -81.8021, name: 'Key West', expected: 'florida_keys_tropical' },
+      { lat: 27.6648, lon: -82.5158, name: 'Tampa', expected: 'florida_southern' },
+      { lat: 30.3322, lon: -81.6557, name: 'Jacksonville', expected: 'humid_subtropical' },
     ];
-
-    floridaLocs.forEach(({ lat, lon, name }) => {
-      const zone = assignClimateZone(lat, lon, 'US');
-      expect(zone).toBe('humid_southeast', `${name} should be humid_southeast`);
+    floridaLocs.forEach(({ lat, lon, name, expected }) => {
+      expect(assignClimateZone(lat, lon, 'US')).toBe(expected, `${name} should be ${expected}`);
     });
+  });
   });
 
   /**
    * Boundary test: Ensure Key West is not misclassified
-   * (it's tropical-ish but still gets humid_southeast)
+   * (it's tropical-ish but still gets florida_keys_tropical)
    */
   test('Key West boundary: lat < 37 AND lon >= -100', () => {
     const keyWestLat = 24.5548;
     const keyWestLon = -81.8021;
 
-    // Check both conditions that define humid_southeast
+    // Check both conditions that define florida_keys_tropical
     expect(keyWestLat < 37).toBe(true);
     expect(keyWestLon >= -100).toBe(true);
 
@@ -88,7 +86,7 @@ describe('Geocoding: Location validation', () => {
     expect(keyWestLat >= 35).toBe(false); // lat < 35
 
     const zone = assignClimateZone(keyWestLat, keyWestLon, 'US');
-    expect(zone).toBe('humid_southeast');
+    expect(zone).toBe('florida_keys_tropical');
   });
 
   /**
@@ -103,11 +101,11 @@ describe('Geocoding: Location validation', () => {
     expect(juneauLat >= 54).toBe(true);
 
     // Juneau does match pacific_maritime criteria too (lon <= -116)
-    // But alaska rule comes FIRST in ZONE_RULES, so it takes precedence
+    // But alaska_south_coastal rule comes FIRST in ZONE_RULES, so it takes precedence
     expect(juneauLon <= -116).toBe(true);
 
     const zone = assignClimateZone(juneauLat, juneauLon, 'US');
-    expect(zone).toBe('alaska'); // Correct due to rule order
+    expect(zone).toBe('alaska_south_coastal'); // Correct due to rule order
   });
 
   /**
@@ -130,6 +128,6 @@ describe('Geocoding: Location validation', () => {
 
     // Should match alaska
     const zone = assignClimateZone(juneauLat, juneauLon, 'US');
-    expect(zone).toBe('alaska');
+    expect(zone).toBe('alaska_south_coastal');
   });
 });
