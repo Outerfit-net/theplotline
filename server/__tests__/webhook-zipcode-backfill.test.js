@@ -14,7 +14,7 @@ function getTestDb() {
   const db = initTestDb(':memory:');
   
   // Seed some climate zones for foreign key constraints
-  const zones = ['high_plains', 'california_med', 'humid_subtropical', 'alaska_south_coastal', 'pacific_maritime'];
+  const zones = ['high_plains', 'california_med', 'humid_subtropical', 'alaska_south_coastal', 'pacific_maritime', 'florida_southern', 'florida_keys_tropical', 'desert_southwest', 'great_plains', 'great_lakes', 'northeast', 'appalachian', 'southern_plains', 'upper_midwest_continental'];
   for (const zone of zones) {
     db.prepare(`
       INSERT OR IGNORE INTO climate_zones (id, name)
@@ -118,7 +118,7 @@ function handleCheckoutCompletedWithBackfill(db, session, geoCodeFn) {
           result.climateZone = zoneId;
         }
       } catch (e) {
-        // Geocoding failure is non-fatal
+        console.error('[backfill] geocode error:', e.message);
       }
     }
   }
@@ -253,13 +253,13 @@ describe('Webhook: checkout.session.completed with zipcode backfill', () => {
       expect(result.zipcode).toBeNull(); // Don't update zipcode (already have one)
       expect(result.lat).toBeCloseTo(25.7, 1);
       expect(result.lon).toBeCloseTo(-80.2, 1);
-      expect(result.climateZone).toBe('humid_subtropical');
+      expect(result.climateZone).toBe('florida_southern');
 
       const updated = db.prepare('SELECT zipcode, lat, lon, climate_zone_id FROM subscribers WHERE id = ?').get(sub.id);
       expect(updated.zipcode).toBe(existingZip); // unchanged
       expect(updated.lat).toBeCloseTo(25.7, 1); // updated from geocode
       expect(updated.lon).toBeCloseTo(-80.2, 1);
-      expect(updated.climate_zone_id).toBe('humid_subtropical');
+      expect(updated.climate_zone_id).toBe('florida_southern');
     });
 
     /**
