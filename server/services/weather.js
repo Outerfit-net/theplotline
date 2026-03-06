@@ -148,14 +148,15 @@ async function getWeather(lat, lon, country = 'US', timezone = 'auto') {
  * @returns {string} weather_type
  */
 function detectWeatherType(current = '') {
+  // Valid masthead types: sunny, cloudy, rainy, snowy, frost, heat
   const c = current.toLowerCase();
-  if (c.includes('snow')) return 'snowy';
-  if (c.includes('rain') || c.includes('shower') || c.includes('drizzle')) return 'rainy';
-  if (c.includes('thunder')) return 'stormy';
-  if (c.includes('fog')) return 'foggy';
-  if (c.includes('cloud') || c.includes('overcast')) return 'cloudy';
-  if (c.includes('clear') || c.includes('sunny')) return 'sunny';
-  return 'partly_cloudy';
+  if (c.includes('snow') || c.includes('blizzard') || c.includes('flurr')) return 'snowy';
+  if (c.includes('frost') || c.includes('freez') || c.includes('ice')) return 'frost';
+  if (c.includes('rain') || c.includes('shower') || c.includes('drizzle') || c.includes('thunder')) return 'rainy';
+  if (c.includes('fog') || c.includes('cloud') || c.includes('overcast') || c.includes('partly')) return 'cloudy';
+  if (c.includes('hot') || c.includes('heat') || c.includes('humid') || c.includes('scorch')) return 'heat';
+  if (c.includes('clear') || c.includes('sunny') || c.includes('fair')) return 'sunny';
+  return 'cloudy'; // safe default — never returns invalid type
 }
 
 module.exports = { getWeather, getWeatherOpenMeteo, getWeatherNWS, detectWeatherType };

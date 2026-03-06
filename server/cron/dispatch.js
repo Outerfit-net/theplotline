@@ -19,6 +19,7 @@ const { getSubRegion, getSubRegionFlavor } = require('../services/sub-regions');
 
 const MASTHEAD_DIR = path.join(__dirname, '..', '..', 'data', 'mastheads');
 const MASTHEAD_SCRIPT = path.join(__dirname, '..', 'services', 'generate_masthead.py');
+const ART_SCRIPT = path.join('/home/administrator/openclaw/skills/garden-conversation/generate_art.py');
 const TITLE_SCRIPT   = path.join(__dirname, '..', 'services', 'generate_title.py');
 const APP_URL = process.env.APP_URL || 'https://theplotline.net';
 
@@ -96,27 +97,48 @@ async function getMasthead(combo, dailyRun) {
     return `${APP_URL}/mastheads/${filename}`;
   }
 
-  // Generate
+  // Generate — two-step: art layer first, then composite text over it
   return new Promise((resolve) => {
-    const mastheadArgs = [
-      MASTHEAD_SCRIPT, station, author, season, weatherType,
-      '--output', filepath,
-      '--solar-term', solarTerm,
-    ];
-    if (title) mastheadArgs.push('--title', title);
-    const proc = spawn('python3', mastheadArgs, { timeout: 15000 });
 
-    proc.on('close', (code) => {
-      if (code === 0 && fs.existsSync(filepath)) {
-        resolve(`${APP_URL}/mastheads/${filename}`);
-      } else {
-        console.warn(`[masthead] Generation failed for ${filename} (code ${code})`);
-        resolve(null);
+    // Step 1: generate SD art layer
+    const climateZone = combo.climate_zone_id || 'high_plains';
+    const artArgs = [ART_SCRIPT, climateZone, weatherType];
+    const artProc = spawn('python3', artArgs, { timeout: 30000 });
+    let artPath = null;
+    artProc.stdout.on('data', (d) => { artPath = d.toString().trim().split('\n').pop(); });
+
+    artProc.on('close', (artCode) => {
+      if (artCode !== 0 || !artPath) {
+        console.warn(`[masthead] Art generation failed (code ${artCode}), compositing without art`);
       }
-    });
 
-    proc.on('error', (err) => {
-      console.warn(`[masthead] spawn error: ${err.message}`);
+      // Step 2: composite masthead
+      const mastheadArgs = [
+        MASTHEAD_SCRIPT, station, author, season, weatherType,
+        '--output', filepath,
+        '--solar-term', solarTerm,
+      ];
+      if (artPath && fs.existsSync(artPath)) mastheadArgs.push('--art-layer', artPath);
+      if (title) mastheadArgs.push('--title', title);
+      const proc = spawn('python3', mastheadArgs, { timeout: 15000 });
+
+      proc.on('close', (code) => {
+        if (code === 0 && fs.existsSync(filepath)) {
+          resolve(`${APP_URL}/mastheads/${filename}`);
+        } else {
+          console.warn(`[masthead] Generation failed for ${filename} (code ${code})`);
+          resolve(null);
+        }
+      });
+
+      proc.on('error', (err) => {
+        console.warn(`[masthead] spawn error: ${err.message}`);
+        resolve(null);
+      });
+    }); // artProc.on('close')
+
+    artProc.on('error', (err) => {
+      console.warn(`[masthead] art spawn error: ${err.message}`);
       resolve(null);
     });
   });
