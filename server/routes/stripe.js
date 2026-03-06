@@ -96,7 +96,7 @@ async function stripeRoutes(fastify) {
       await db.prepare(`
         UPDATE subscribers
         SET subscription_status = 'canceled',
-            active = NULL,
+            active = 0,
             cancelled_at = NOW()
         WHERE id = ?
       `).run(subscriber.id);
@@ -559,7 +559,7 @@ If you're not interested, you can ignore this email.
           await db.prepare(`
             UPDATE subscribers
             SET subscription_status = 'canceled',
-                active = NULL,
+                active = 0,
                 cancelled_at = NOW()
             WHERE stripe_customer_id = ?
           `).run(customerId);
