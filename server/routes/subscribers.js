@@ -111,16 +111,19 @@ async function subscriberRoutes(fastify) {
     try {
       // Check existing
       const existing = await db.prepare(
-        'SELECT id, active, confirmed_at FROM subscribers WHERE email = ?'
+        'SELECT id, active, confirmed_at, subscription_status FROM subscribers WHERE email = ?'
       ).get(email);
 
       if (existing) {
-        if (existing.active && existing.confirmed_at) {
+        // Block only if they have an active PAID subscription
+        if (existing.subscription_status === 'active') {
           return reply.code(409).send({
             error: 'Email already subscribed',
-            message: 'This email is already subscribed to The Plot Line.'
+            message: 'This email already has an active paid subscription.'
           });
         }
+        
+        // If they have a free newsletter but no paid sub, let them proceed to checkout
         // Reactivate or resend
         const confirmToken = generateToken();
         const unsubscribeToken = generateToken();
@@ -241,25 +244,54 @@ async function subscriberRoutes(fastify) {
   }, async (request, reply) => {
     const { token } = request.params;
     const db = fastify.db;
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+
+    const htmlPage = (title, message) => `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body { font-family: Georgia, serif; background: #faf8f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }
+          .container { background: white; padding: 40px 60px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; }
+          h1 { color: #2d4a3e; font-size: 28px; margin-bottom: 16px; }
+          p { color: #4a4a4a; font-size: 18px; line-height: 1.6; }
+          .emoji { font-size: 48px; margin-bottom: 20px; }
+          a { color: #4a7c59; text-decoration: none; }
+          a:hover { text-decoration: underline; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="emoji">${title.includes('Confirmed') ? '✅' : '🌿'}</div>
+          <h1>${title}</h1>
+          <p>${message}</p>
+          <p style="margin-top: 24px;"><a href="${clientUrl}">Return to The Plot Line</a></p>
+        </div>
+      </body>
+      </html>
+    `;
+
     try {
       const subscriber = await db.prepare(
         'SELECT id, email, confirmed_at FROM subscribers WHERE confirm_token=?'
       ).get(token);
 
-      if (!subscriber) return reply.code(404).send({ error: 'Invalid confirmation token' });
+      if (!subscriber) {
+        return reply.type('text/html').send(htmlPage('Invalid Link', 'This confirmation link is invalid or has expired.'));
+      }
 
       if (subscriber.confirmed_at) {
-        return reply.code(200).send({ message: 'Email already confirmed', email: subscriber.email });
+        return reply.type('text/html').send(htmlPage('Already Confirmed', 'Your email was already confirmed. You\'re all set!'));
       }
 
       await db.prepare(
         "UPDATE subscribers SET confirmed_at=NOW(), confirm_token=NULL WHERE id=?"
       ).run(subscriber.id);
 
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
       return reply.redirect(`${clientUrl}?confirmed=true&email=${encodeURIComponent(subscriber.email)}`);
     } catch (err) {
-      return reply.code(500).send({ error: 'Failed to confirm subscription' });
+      return reply.type('text/html').send(htmlPage('Something Went Wrong', 'There was an error confirming your email. Please try again.'));
     }
   });
 

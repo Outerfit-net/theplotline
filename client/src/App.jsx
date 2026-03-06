@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useSearchParams } from 'react-router-dom';
 import SignupForm from './components/SignupForm';
 import PlanSelector from './components/PlanSelector';
 import SampleConversation from './components/SampleConversation';
@@ -11,9 +11,14 @@ import Admin from './pages/Admin';
 import Manage from './pages/Manage';
 
 function Home() {
+  const [searchParams] = useSearchParams();
   const [confirmed, setConfirmed] = useState(false);
   const [showPlanSelector, setShowPlanSelector] = useState(false);
   const [subscriberData, setSubscriberData] = useState(null);
+
+  // Extract promo code and plan from URL
+  const promoCode = searchParams.get('code');
+  const refPlan = searchParams.get('plan');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -46,6 +51,8 @@ function Home() {
         <PlanSelector
           email={subscriberData.email}
           subscriberId={subscriberData.id}
+          promoCode={promoCode}
+          refPlan={refPlan}
           onClose={handlePlanSelectorClose}
         />
       )}

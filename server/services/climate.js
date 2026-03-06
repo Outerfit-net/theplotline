@@ -54,6 +54,12 @@ const ZONE_RULES = [
   },
 
   // ── UNITED STATES ─────────────────────────────────────────────────────────
+  // Alaska: lat > 54 catches all of AK including Southeast (Juneau ~58.3°N)
+  {
+    id: 'alaska',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 54,
+  },
   // Pacific Maritime: West Coast north of ~37°N
   {
     id: 'pacific_maritime',

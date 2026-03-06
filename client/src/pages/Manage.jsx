@@ -16,6 +16,35 @@ export default function Manage() {
   const [giftSuccess, setGiftSuccess] = useState(null);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  
+  // Settings form
+  const [author, setAuthor] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [zipcode, setZipcode] = useState('');
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState(null);
+  const [country, setCountry] = useState('US');
+
+  const COUNTRIES = [
+    { code: 'US', name: 'United States' },
+    { code: 'CA', name: 'Canada' },
+  ];
+
+  const AUTHORS = [
+    { key: 'hemingway', name: 'Ernest Hemingway' },
+    { key: 'carver', name: 'Raymond Carver' },
+    { key: 'munro', name: 'Alice Munro' },
+    { key: 'morrison', name: 'Toni Morrison' },
+    { key: 'oates', name: 'Joyce Carol Oates' },
+    { key: 'lopez', name: 'Barry Lopez' },
+    { key: 'strout', name: 'Elizabeth Strout' },
+    { key: 'bass', name: 'Rick Bass' },
+    { key: 'mccarthy', name: 'Cormac McCarthy' },
+    { key: 'oconnor', name: 'Flannery O\'Connor' },
+    { key: 'hurston', name: 'Zora Neale Hurston' },
+    { key: 'saunders', name: 'George Saunders' },
+  ];
 
   useEffect(() => {
     if (!email || !token) {
@@ -34,6 +63,11 @@ export default function Manage() {
         }
         const data = await response.json();
         setStatus(data);
+        setAuthor(data.author || 'hemingway');
+        setCity(data.city || '');
+        setState(data.state || '');
+        setZipcode(data.zipcode || '');
+        setCountry(data.country || 'US');
         setError(null);
       } catch (err) {
         setError(err.message);
@@ -204,6 +238,16 @@ export default function Manage() {
         {/* Tabs */}
         <div className="flex gap-4 border-b border-[var(--color-cream-dark)] mb-6">
           <button
+            onClick={() => setActiveTab('settings')}
+            className={`pb-3 px-2 border-b-2 transition ${
+              activeTab === 'settings'
+                ? 'border-[var(--color-green)] text-[var(--color-green)]'
+                : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-green)]'
+            }`}
+          >
+            Settings
+          </button>
+          <button
             onClick={() => setActiveTab('invite')}
             className={`pb-3 px-2 border-b-2 transition ${
               activeTab === 'invite'
@@ -234,6 +278,130 @@ export default function Manage() {
             Cancel Subscription
           </button>
         </div>
+
+        {/* Settings */}
+        {activeTab === 'settings' && (
+          <div>
+            <p className="text-[var(--color-text-muted)] mb-6">
+              Customize your garden letter experience.
+            </p>
+            
+            <div className="space-y-4 max-w-md">
+              <div>
+                <label className="block text-sm font-semibold text-[var(--color-green)] mb-2">
+                  Writing Style
+                </label>
+                <select
+                  value={author}
+                  onChange={(e) => setAuthor(e.target.value)}
+                  className="w-full px-4 py-2 border border-[var(--color-cream)] rounded-lg"
+                >
+                  {AUTHORS.map((a) => (
+                    <option key={a.key} value={a.key}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-[var(--color-green)] mb-2">
+                  Country
+                </label>
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="w-full px-4 py-2 border border-[var(--color-cream)] rounded-lg"
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-[var(--color-green)] mb-2">
+                  City
+                </label>
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full px-4 py-2 border border-[var(--color-cream)] rounded-lg"
+                  placeholder="Boulder"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--color-green)] mb-2">
+                    State
+                  </label>
+                  <input
+                    type="text"
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
+                    className="w-full px-4 py-2 border border-[var(--color-cream)] rounded-lg"
+                    placeholder="CO"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--color-green)] mb-2">
+                    ZIP Code
+                  </label>
+                  <input
+                    type="text"
+                    value={zipcode}
+                    onChange={(e) => setZipcode(e.target.value)}
+                    className="w-full px-4 py-2 border border-[var(--color-cream)] rounded-lg"
+                    placeholder="80301"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={async () => {
+                  setSavingSettings(true);
+                  setSettingsMessage(null);
+                  try {
+                    const res = await fetch('/api/subscription/update', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        email,
+                        token,
+                        author,
+                        city,
+                        state,
+                        country,
+                        zipcode
+                      }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error);
+                    setSettingsMessage('Settings saved!');
+                  } catch (err) {
+                    setSettingsMessage('Error: ' + err.message);
+                  } finally {
+                    setSavingSettings(false);
+                  }
+                }}
+                disabled={savingSettings}
+                className="w-full px-4 py-3 bg-[var(--color-green)] text-white rounded-lg hover:bg-[var(--color-green-dark)] transition disabled:opacity-50"
+              >
+                {savingSettings ? 'Saving...' : 'Save Settings'}
+              </button>
+
+              {settingsMessage && (
+                <p className={`text-sm ${settingsMessage.includes('Error') ? 'text-red-600' : 'text-green-600'}`}>
+                  {settingsMessage}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Invite a Friend */}
         {activeTab === 'invite' && (

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 
-function PlanSelector({ email, subscriberId, onClose }) {
+function PlanSelector({ email, subscriberId, promoCode, refPlan, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState(refPlan || 'monthly');
 
   const handleSelectPlan = async (plan) => {
     setLoading(true);
@@ -16,6 +17,7 @@ function PlanSelector({ email, subscriberId, onClose }) {
           email,
           plan,
           subscriberId,
+          promoCode,
         }),
       });
 
@@ -48,9 +50,11 @@ function PlanSelector({ email, subscriberId, onClose }) {
         <div className="space-y-4 mb-6">
           {/* Weekly Plan */}
           <button
-            onClick={() => handleSelectPlan('weekly')}
+            onClick={() => { setSelectedPlan('weekly'); handleSelectPlan('weekly'); }}
             disabled={loading}
-            className="w-full p-4 border-2 border-[var(--color-cream-dark)] rounded-lg hover:border-[var(--color-green)] hover:bg-green-50 transition-all text-left disabled:opacity-50"
+            className={`w-full p-4 border-2 rounded-lg hover:bg-green-50 transition-all text-left disabled:opacity-50 ${
+              selectedPlan === 'weekly' ? 'border-[var(--color-green)] bg-green-50' : 'border-[var(--color-cream-dark)]'
+            }`}
           >
             <div className="flex justify-between items-start">
               <div>
@@ -66,13 +70,15 @@ function PlanSelector({ email, subscriberId, onClose }) {
 
           {/* Monthly Plan */}
           <button
-            onClick={() => handleSelectPlan('monthly')}
+            onClick={() => { setSelectedPlan('monthly'); handleSelectPlan('monthly'); }}
             disabled={loading}
-            className="w-full p-4 border-2 border-[var(--color-green)] rounded-lg bg-green-50 hover:border-[var(--color-green-dark)] transition-all text-left disabled:opacity-50 relative"
+            className={`w-full p-4 border-2 rounded-lg hover:bg-green-50 transition-all text-left disabled:opacity-50 relative ${
+              selectedPlan === 'monthly' ? 'border-[var(--color-green)] bg-green-50' : 'border-[var(--color-green)]'
+            }`}
           >
-            <div className="absolute top-2 right-2">
+            <div className="absolute -top-3 left-4">
               <span className="inline-block bg-[var(--color-green)] text-white text-xs px-2 py-1 rounded-full">
-                Save 50%
+                Save 17%
               </span>
             </div>
             <div className="flex justify-between items-start">
@@ -83,6 +89,31 @@ function PlanSelector({ email, subscriberId, onClose }) {
               <div className="text-right">
                 <div className="text-xl font-bold text-[var(--color-green)]">$3.99</div>
                 <div className="text-xs text-[var(--color-text-muted)]">per month</div>
+              </div>
+            </div>
+          </button>
+
+          {/* Annual Plan */}
+          <button
+            onClick={() => { setSelectedPlan('annual'); handleSelectPlan('annual'); }}
+            disabled={loading}
+            className={`w-full p-4 border-2 rounded-lg hover:bg-green-50 transition-all text-left disabled:opacity-50 relative ${
+              selectedPlan === 'annual' ? 'border-[var(--color-green)] bg-green-50' : 'border-[var(--color-green)]'
+            }`}
+          >
+            <div className="absolute -top-3 left-4">
+              <span className="inline-block bg-[var(--color-green)] text-white text-xs px-2 py-1 rounded-full">
+                Best Value — Save 58%
+              </span>
+            </div>
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-semibold text-[var(--color-green-dark)]">Annual</h3>
+                <p className="text-sm text-[var(--color-text-muted)]">Billed annually</p>
+              </div>
+              <div className="text-right">
+                <div className="text-xl font-bold text-[var(--color-green)]">$40</div>
+                <div className="text-xs text-[var(--color-text-muted)]">per year</div>
               </div>
             </div>
           </button>

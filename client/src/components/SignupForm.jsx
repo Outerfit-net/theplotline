@@ -75,6 +75,12 @@ function SignupForm({ onSignupSuccess }) {
     e.preventDefault();
     setLoading(true); setMessage(null); setError(null);
     try {
+      // Require state for US subscribers
+      if (country === 'US' && !state) {
+        setError('Please select your state.');
+        setLoading(false);
+        return;
+      }
       const body = { email, city, country, author, cf_turnstile_response: turnstileToken };
       if (country === 'US' && state) body.state = state;
       if (country === 'US' && zipcode) body.zipcode = zipcode;
@@ -148,9 +154,9 @@ function SignupForm({ onSignupSuccess }) {
           {isUS && (
             <div>
               <label className="block text-sm font-medium text-[var(--color-text-muted)] mb-1">State</label>
-              <select value={state} onChange={e => setState(e.target.value)}
+              <select value={state} onChange={e => setState(e.target.value)} required
                 className="w-full px-3 py-1.5 border border-[var(--color-cream-dark)] rounded-lg focus:ring-2 focus:ring-[var(--color-green)] outline-none bg-white text-sm">
-                <option value="">Select...</option>
+                <option value="">Select state *</option>
                 {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>

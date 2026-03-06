@@ -197,7 +197,7 @@ const BOUNDING_BOXES = [
   [30.0, 31.0, -87.5, -85.0, 'fl_panhandle'],
   [27.5, 29.0, -83.0, -80.5, 'fl_central'],
   [27.5, 28.5, -82.5, -80.5, 'fl_west_coast'],
-  [25.5, 27.0, -80.5, -80.0, 'fl_southern'],
+  [24.4, 27.0, -80.5, -79.8, 'fl_southern'],  // extended south to include Florida Keys / Key West (lat ~24.55)
 
   // ── Alabama ────────────────────────────────────────────────────────────────
   [32.0, 35.0, -88.5, -85.0, 'al_north'],
@@ -312,7 +312,10 @@ const BOUNDING_BOXES = [
   [42.0, 49.0, -117.0, -111.0, 'id_statewide'],
 
   // ── Alaska ──────────────────────────────────────────────────────────────────
-  [54.0, 72.0, -180.0, -130.0, 'ak_statewide'],
+  // NOTE: lon range extended to -140.0 to include Southeast Alaska (Juneau = -134.4)
+  // and the Aleutian Islands wrap past -180 but we handle that via the station map
+  [54.0, 72.0, -180.0, -140.0, 'ak_statewide'],
+  [54.0, 72.0, -140.0, -129.0, 'ak_statewide'],  // Southeast AK: Juneau, Ketchikan, Sitka
 
   // ── Hawaii ──────────────────────────────────────────────────────────────────
   [18.5, 22.5, -160.0, -154.5, 'hi_statewide'],
