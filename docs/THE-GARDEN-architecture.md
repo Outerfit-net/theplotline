@@ -142,7 +142,7 @@ thegarden.email {
 |-----------|------------|-------|
 | Signup app | React + Vite | Single page — email, region, author, frequency |
 | Backend | Fastify 4.x (port 3001) | Separate from outerfit (port 3000) |
-| Database | SQLite | plotlines.db — subscribers, combinations, daily_runs, deliveries |
+| Database | PostgreSQL | `postgresql://plotlines@localhost:5432/plotlines` — migrated from SQLite |
 | LLM calls | Python engine | `server/garden/engine.py` — spawned per combo, output JSON |
 | Weather | NWS + Open-Meteo fallback | NWS for US stations, Open-Meteo international |
 | Email | SMTP (nodemailer) | Confirmation + daily dispatch + gift emails |
@@ -202,33 +202,43 @@ For each active location+author combo:
 
 ```sql
 -- Subscribers
-CREATE TABLE IF NOT EXISTS subscribers (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  email           TEXT NOT NULL UNIQUE,
-  name            TEXT,
-  region          TEXT NOT NULL,    -- USDA zone: '5b', '9a', etc.
-  state           TEXT,             -- US state for weather lookup
-  latitude        REAL,             -- for Open-Meteo
-  longitude       REAL,
-  author_voice    TEXT DEFAULT 'hemingway',
-  frequency       TEXT DEFAULT 'daily',  -- 'daily' | 'weekly'
-  weekly_day      TEXT DEFAULT 'monday', -- for weekly subscribers
-  timezone        TEXT DEFAULT 'America/Denver',
-  status          TEXT DEFAULT 'active', -- 'active' | 'paused' | 'cancelled' | 'unconfirmed'
-  stripe_customer_id TEXT,
-  stripe_subscription_id TEXT,
-  subscription_plan TEXT,               -- 'daily' | 'weekly'
-  subscription_status TEXT,              -- from Stripe: 'active', 'past_due', 'canceled', etc.
-  subscription_end_date DATETIME,       -- when current period ends
-  unsubscribe_token TEXT,
-  referrer_id     TEXT,                 -- who referred this subscriber
-  referral_code   TEXT UNIQUE,         -- this subscriber's referral code
-  gift_recipient_email TEXT,            -- if this is a gift sub
-  gift_sender_email TEXT,               -- who sent the gift
-  beta_invite    TEXT,                 -- beta invite code used
-  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-  confirmed_at    DATETIME
+-- PostgreSQL (migrated from SQLite, 2026-03)
+CREATE TABLE subscribers (
+  id                      TEXT PRIMARY KEY,
+  email                   TEXT UNIQUE NOT NULL,
+  location_city           TEXT,
+  location_state          TEXT,
+  location_country        TEXT DEFAULT 'US',
+  zipcode                 TEXT,
+  lat                     DOUBLE PRECISION,
+  lon                     DOUBLE PRECISION,
+  timezone                TEXT,
+  hemisphere              TEXT DEFAULT 'N',
+  author_key              TEXT DEFAULT 'hemingway',
+  climate_zone_id         TEXT REFERENCES climate_zones(id),
+  station_code            TEXT,
+  active                  INTEGER DEFAULT 1,  -- 1=active, 0=inactive/canceled (soft delete)
+  created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  confirmed_at            TIMESTAMP,
+  unsubscribed_at         TIMESTAMP,
+  cancelled_at            TIMESTAMP,          -- set when subscription is canceled
+  stripe_customer_id      TEXT,
+  stripe_subscription_id  TEXT,
+  subscription_id         TEXT,
+  plan                    TEXT,               -- 'weekly' | 'monthly' | 'annual'
+  subscription_status     TEXT,              -- 'active' | 'past_due' | 'canceled'
+  subscription_end_date   TEXT,
+  confirm_token           TEXT,
+  unsubscribe_token       TEXT,
+  referral_code           TEXT,
+  auth_token_expires_at   TIMESTAMP,
+  management_token        UUID DEFAULT gen_random_uuid()
 );
+
+-- Soft delete convention:
+--   Cancel: active=0, cancelled_at=NOW(), subscription_status='canceled'
+--   Unsubscribe: active=0, unsubscribed_at=NOW()
+--   Reactivation: active=1, cancelled_at=NULL, subscription_status='active'
 
 -- Referral tracking
 CREATE TABLE IF NOT EXISTS referrals (

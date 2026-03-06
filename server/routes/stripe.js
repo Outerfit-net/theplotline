@@ -312,7 +312,8 @@ If you're not interested, you can ignore this email.
 
   // ── POST /api/stripe/create-checkout ──────────────────────────────────────
   fastify.post('/stripe/create-checkout', async (request, reply) => {
-    const { email, plan, subscriberId, promoCode } = request.body;
+    const { email, subscriberId, promoCode } = request.body;
+    let { plan } = request.body;
 
     if (!email || !plan) {
       return reply.code(400).send({ error: 'Missing required fields: email, plan' });
