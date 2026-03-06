@@ -302,15 +302,36 @@ This ensures subscribers who skip the optional zip field still get correctly zon
 3. `assignClimateZone(lat, lon, country)` → `climate_zone_id` (e.g. `high_plains`, `humid_southeast`, `alaska`)
 4. US: NWS station lookup for hyper-local weather
 
-**Climate zones** (`server/services/climate.js`):
-`alaska` | `pacific_maritime` | `california_med` | `high_plains` | `appalachian` |
-`humid_southeast` | `upper_midwest` | `northeast` | `great_plains` | `uk_maritime` |
-`mediterranean_eu` | `central_europe` | `canada_prairie` | `canada_maritime` | `australia_tropical` | `australia_temperate`
+**Climate zones** (`server/services/climate.js`) — 28 zones as of 2026-03-06:
+
+*US zones:*
+`high_plains` | `pacific_maritime` | `california_med` | `desert_southwest` |
+`great_plains` | `great_lakes` | `upper_midwest_continental` | `appalachian` |
+`humid_subtropical` | `northeast` | `southern_plains` | `florida_southern` |
+`florida_keys_tropical` | `hawaii` | `alaska_interior` | `alaska_south_coastal`
+
+*International:*
+`uk_maritime` | `mediterranean_eu` | `central_europe` | `canada_prairie` |
+`canada_maritime` | `japan_temperate` | `iceland_subarctic` | `australia_tropical` |
+`australia_temperate` | `south_africa_temperate` | `south_africa_subtropical` | `brazil_subtropical`
+
+**Zone naming changes (2026-03-06):**
+- `alaska` → split into `alaska_interior` (Fairbanks, Barrow, lat ≥ 64) and `alaska_south_coastal` (Anchorage, Juneau)
+- `upper_midwest` → `upper_midwest_continental`
+- `humid_southeast` → `humid_subtropical`
+- New: `great_lakes` split from `upper_midwest` (lake-effect snow belt: Duluth, Cleveland, Chicago)
+- New: `florida_keys_tropical`, `florida_southern`, `desert_southwest`, `southern_plains`, `hawaii`
+
+**Seasonal timing** (`garden_seasons.py` — `ZONE_OFFSETS`):
+Each zone has spring/summer/fall/winter day offsets relative to `high_plains` baseline.
+- Positive offset = season arrives LATER (e.g. `alaska_south_coastal` spring +14 days)
+- Negative offset = season arrives EARLIER (e.g. `florida_keys_tropical` spring -30 days)
+- Tropical zones (hawaii, florida_keys_tropical) have near-zero winter offset — no real winter
 
 **Sub-region lookup** (`server/services/sub-regions.js`):
 Two-pass: lat/lon bounding boxes → NWS station code fallback.
-104 sub-regions → 16 climate zones. Coverage: all US states including Alaska (SE box lon -140→-129)
-and Florida Keys (fl_southern extended to lat 24.4).
+~100 sub-regions → 28 climate zones. Sub-regions inject location-specific flavor text
+into LLM prompts ("You garden in the Willamette Valley..."). Zone handles timing; sub-region handles voice.
 
 **Admin KPI date semantics:**
 - `created_at` — immutable, original signup timestamp
@@ -735,7 +756,7 @@ Each new author voice is a marketing event.
 ## Test Coverage
 
 **Run tests:** `cd /opt/plotlines/server && npm test`
-**Current:** 9 suites, ~160 tests, 0 failures
+**Current:** 10 suites, ~230 tests (63 climate tests), 1 unrelated failure (webhook geocoding)
 
 **Test philosophy:** Tests must use real coordinates and real assertions.
 Never hardcode math like `(33791/33791)*100 > 85` — that tests nothing.
@@ -751,9 +772,14 @@ Never reuse the same lat/lon for multiple zip codes.
 | `climate.test.js` | Zone assignment rules, boundary conditions |
 
 **Known gaps (test.todo):**
-- Hawaii (no climate zone defined)
-- Puerto Rico, Guam (territories)
-- Japan, Brazil, South Africa, Iceland (international gaps)
+- Puerto Rico, Guam (territories — no zone defined)
+- Sub-region flavor text for new zones (hawaii, florida_keys_tropical, etc.)
+
+**Resolved gaps (2026-03-06):**
+- ✅ Hawaii → `hawaii` zone
+- ✅ Key West → `florida_keys_tropical`
+- ✅ Juneau → `alaska_south_coastal`
+- ✅ Japan, Brazil, South Africa, Iceland → international zones added
 
 **What good tests caught (2026-03-06):**
 - Key West resolving to `high_plains` (wrong Boulder coords in DB)
