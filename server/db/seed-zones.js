@@ -36,11 +36,11 @@ const CLIMATE_ZONES = [
     micro_seasons_built: 0,
   },
   {
-    id: 'upper_midwest',
+    id: 'upper_midwest_continental',
     name: 'Upper Midwest Continental',
-    description: 'Brutal winters, short intense summer, high humidity, early spring mud. Frost through May, first frost September.',
+    description: 'Brutal winters, short intense summer, high humidity, early spring mud. Frost through May, first frost September. Zone 4a-5b.',
     koppen_codes: JSON.stringify(['Dfa','Dfb']),
-    representative_cities: JSON.stringify(['Minneapolis MN','Milwaukee WI','Detroit MI','Chicago IL','Cleveland OH']),
+    representative_cities: JSON.stringify(['Minneapolis MN','Milwaukee WI','Chicago IL','Madison WI','Indianapolis IN']),
     hemisphere: 'N',
     micro_seasons_built: 0,
   },
@@ -54,11 +54,11 @@ const CLIMATE_ZONES = [
     micro_seasons_built: 0,
   },
   {
-    id: 'humid_southeast',
+    id: 'humid_subtropical',
     name: 'Humid Subtropical',
-    description: 'Heat and humidity, mild winters, long growing season, pests year-round, hurricane season. Camellias bloom in January.',
+    description: 'Heat and humidity, mild winters, long growing season, pests year-round, hurricane season. No frost in deep south. Zone 7a-9b.',
     koppen_codes: JSON.stringify(['Cfa']),
-    representative_cities: JSON.stringify(['Atlanta GA','Houston TX','New Orleans LA','Charlotte NC','Nashville TN','Jacksonville FL']),
+    representative_cities: JSON.stringify(['Atlanta GA','Houston TX','New Orleans LA','Charlotte NC','Nashville TN']),
     hemisphere: 'N',
     micro_seasons_built: 0,
   },
@@ -141,6 +141,139 @@ const CLIMATE_ZONES = [
     koppen_codes: JSON.stringify(['Dfb','Cfb']),
     representative_cities: JSON.stringify(['Toronto ON','Ottawa ON','Montreal QC','Halifax NS','Victoria BC']),
     hemisphere: 'N',
+    micro_seasons_built: 0,
+  },
+
+  // ─── NEW ZONES (2026-03-06 zone expansion) ────────────────────────────────
+
+  // ALASKA ZONES
+  {
+    id: 'alaska_interior',
+    name: 'Alaska Interior',
+    description: 'Extreme continental subarctic. Fairbanks area, -40°F winters, compressed spring. Zone 1a-2a.',
+    koppen_codes: JSON.stringify(['Dfc']),
+    representative_cities: JSON.stringify(['Fairbanks AK','Denali AK']),
+    hemisphere: 'N',
+    micro_seasons_built: 0,
+  },
+  {
+    id: 'alaska_south_coastal',
+    name: 'South-Central Alaska',
+    description: 'Maritime subarctic. Anchorage, Juneau, -10°F winters, extended winter, spring delayed 2 weeks. Zone 2a-3b.',
+    koppen_codes: JSON.stringify(['Dfc','Cfc']),
+    representative_cities: JSON.stringify(['Anchorage AK','Juneau AK','Ketchikan AK']),
+    hemisphere: 'N',
+    micro_seasons_built: 0,
+  },
+
+  // GREAT LAKES ZONE (NEW)
+  {
+    id: 'great_lakes',
+    name: 'Great Lakes Maritime',
+    description: 'Lake-effect snow belt. Marquette, Duluth, Cleveland. 200+ inches annual snow, extended winter, spring delayed 2-3 weeks. Zone 4a-5b.',
+    koppen_codes: JSON.stringify(['Dfb']),
+    representative_cities: JSON.stringify(['Marquette MI','Duluth MN','Cleveland OH','Detroit MI','Green Bay WI']),
+    hemisphere: 'N',
+    micro_seasons_built: 0,
+  },
+
+  // SOUTHERN PLAINS / RIO GRANDE
+  {
+    id: 'southern_plains',
+    name: 'South Texas & Rio Grande Valley',
+    description: 'Subtropical, hot long growing season, minimal winter, irrigation-dependent. Zone 8a-9b.',
+    koppen_codes: JSON.stringify(['BSh','Cfa']),
+    representative_cities: JSON.stringify(['San Antonio TX','Corpus Christi TX','McAllen TX','Brownsville TX']),
+    hemisphere: 'N',
+    micro_seasons_built: 0,
+  },
+
+  // FLORIDA TROPICAL ZONES
+  {
+    id: 'florida_southern',
+    name: 'Southern Florida Subtropical',
+    description: 'Heat and humidity, mild winters, wet/dry seasons, pests year-round. Frost possible, no year-round tropics. Zone 9a-9b.',
+    koppen_codes: JSON.stringify(['Cfa']),
+    representative_cities: JSON.stringify(['Miami FL','Tampa FL','Fort Myers FL','West Palm Beach FL']),
+    hemisphere: 'N',
+    micro_seasons_built: 0,
+  },
+  {
+    id: 'florida_keys_tropical',
+    name: 'Florida Keys & Tropical Extreme South',
+    description: 'Frost-free tropical. Trade winds shape seasons. Hurricane season (Jun-Nov), calm dry winter (Dec-May). Zone 11-12.',
+    koppen_codes: JSON.stringify(['Af','Am']),
+    representative_cities: JSON.stringify(['Key West FL','Dry Tortugas FL','Marathon FL']),
+    hemisphere: 'N',
+    micro_seasons_built: 0,
+  },
+
+  // DESERT SOUTHWEST
+  {
+    id: 'desert_southwest',
+    name: 'Desert Southwest',
+    description: 'Extreme heat, zero frost, low rain, intense UV. Cooling season year-round in monsoon. Zone 9b-10a.',
+    koppen_codes: JSON.stringify(['BWh','BWk']),
+    representative_cities: JSON.stringify(['Phoenix AZ','Las Vegas NV','Tucson AZ','Palm Springs CA']),
+    hemisphere: 'N',
+    micro_seasons_built: 0,
+  },
+
+  // HAWAII
+  {
+    id: 'hawaii',
+    name: 'Hawaiian Islands',
+    description: 'Tropical year-round, trade winds, wet/dry seasons. No frost. Trade wind dry (May-Sep), Kona wet (Oct-Apr). Zone 10b-12.',
+    koppen_codes: JSON.stringify(['Af','Am']),
+    representative_cities: JSON.stringify(['Honolulu HI','Hilo HI','Maui HI','Kauai HI']),
+    hemisphere: 'N',
+    micro_seasons_built: 0,
+  },
+
+  // INTERNATIONAL ZONES
+  {
+    id: 'iceland_subarctic',
+    name: 'Iceland Subarctic Maritime',
+    description: 'Harsh maritime subarctic. Reykjavik, midnight sun summer, polar twilight winter. Gulf Stream moderates. Zone 2b-3b.',
+    koppen_codes: JSON.stringify(['Cfc']),
+    representative_cities: JSON.stringify(['Reykjavik IS','Akureyri IS']),
+    hemisphere: 'N',
+    micro_seasons_built: 0,
+  },
+  {
+    id: 'japan_temperate',
+    name: 'Japan Temperate',
+    description: 'Monsoon-influenced, cherry blossom spring, typhoon fall. Four seasons. Zone 5b-8a.',
+    koppen_codes: JSON.stringify(['Cfa','Cfb']),
+    representative_cities: JSON.stringify(['Tokyo','Osaka','Kyoto','Yokohama']),
+    hemisphere: 'N',
+    micro_seasons_built: 0,
+  },
+  {
+    id: 'south_africa_temperate',
+    name: 'South Africa Temperate (Cape Region)',
+    description: 'Inverted seasons (Dec-Feb summer), Mediterranean-influenced, mild winters. Zone 7b-9a.',
+    koppen_codes: JSON.stringify(['Csa','Cfb']),
+    representative_cities: JSON.stringify(['Cape Town','Stellenbosch','Hermanus']),
+    hemisphere: 'S',
+    micro_seasons_built: 0,
+  },
+  {
+    id: 'south_africa_subtropical',
+    name: 'South Africa Subtropical (KwaZulu-Natal)',
+    description: 'Inverted seasons (Dec-Feb hottest), summer rain, humid. Zone 9a-11.',
+    koppen_codes: JSON.stringify(['Aw','Cfa']),
+    representative_cities: JSON.stringify(['Durban','Pietermaritzburg']),
+    hemisphere: 'S',
+    micro_seasons_built: 0,
+  },
+  {
+    id: 'brazil_subtropical',
+    name: 'Brazil Subtropical & Tropical',
+    description: 'Tropical monsoon, high humidity, afternoon storms. Year-round growing. Zone 8a-10b.',
+    koppen_codes: JSON.stringify(['Aw','Cfa']),
+    representative_cities: JSON.stringify(['São Paulo','Rio de Janeiro','Brasília']),
+    hemisphere: 'S',
     micro_seasons_built: 0,
   },
 ];
