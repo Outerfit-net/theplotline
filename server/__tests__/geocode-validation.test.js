@@ -52,7 +52,6 @@ describe('Geocoding: Location validation', () => {
       expect(assignClimateZone(lat, lon, 'US')).toBe(expected, `Failed for ${desc}`);
     });
   });
-  });
 
   /**
    * Verify florida_keys_tropical rule applies correctly to Florida peninsula
@@ -67,7 +66,6 @@ describe('Geocoding: Location validation', () => {
     floridaLocs.forEach(({ lat, lon, name, expected }) => {
       expect(assignClimateZone(lat, lon, 'US')).toBe(expected, `${name} should be ${expected}`);
     });
-  });
   });
 
   /**
