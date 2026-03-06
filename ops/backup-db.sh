@@ -1,19 +1,26 @@
 #!/bin/bash
 set -euo pipefail
-# Backup PostgreSQL databases to R2
+# Backup PostgreSQL databases to R2 with GPG encryption
+# GPG key: backup@theplotline.net (private key in Bitwarden: "PlotLines Backup GPG Key")
+# Restore: gpg --decrypt plotlines_DATE.sql.gz.gpg | gunzip | psql ...
 
 DATE=$(date +%Y%m%d_%H%M%S)
+GPG_RECIPIENT="backup@theplotline.net"
 
-# Backup plotlines
-PGPASSWORD="${PGPASSWORD:?PGPASSWORD must be set}" pg_dump -U plotlines -h localhost plotlines | gzip > /tmp/plotlines_${DATE}.sql.gz
-rclone copy /tmp/plotlines_${DATE}.sql.gz outerfit-backups:outerfit-llc/plotlines/
+backup_db() {
+  local DB=$1
+  local DEST=$2
+  local TMP_GZ="/tmp/${DB}_${DATE}.sql.gz"
+  local TMP_ENC="${TMP_GZ}.gpg"
 
-# Backup thread
-PGPASSWORD="${PGPASSWORD}" pg_dump -U plotlines -h localhost thread | gzip > /tmp/thread_${DATE}.sql.gz
-rclone copy /tmp/thread_${DATE}.sql.gz outerfit-backups:outerfit-llc/thread/
+  PGPASSWORD="${PGPASSWORD:?PGPASSWORD must be set}" pg_dump -U plotlines -h localhost "$DB" | gzip > "$TMP_GZ"
+  gpg --batch --yes --trust-model always -r "$GPG_RECIPIENT" --encrypt "$TMP_GZ"
+  rclone copy "$TMP_ENC" "outerfit-backups:outerfit-llc/${DEST}/"
+  rm -f "$TMP_GZ" "$TMP_ENC"
+  echo "[backup] $DB → R2/$DEST OK"
+}
 
-# Keep only last 7 days locally
-find /tmp -name 'plotlines_*.sql.gz' -mtime +7 -delete 2>/dev/null
-find /tmp -name 'thread_*.sql.gz' -mtime +7 -delete 2>/dev/null
+backup_db plotlines plotlines
+backup_db thread thread
 
 echo "Backup complete: ${DATE}"

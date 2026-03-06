@@ -110,10 +110,11 @@ async function subscriberRoutes(fastify) {
 
     const db = fastify.db;
     try {
-      // Check existing — compare against encrypted column
+      // Check existing — use deterministic hash for lookup (pgp_sym_encrypt is non-deterministic)
+      const emailHash = require('crypto').createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
       const existing = await db.prepare(
-        'SELECT id, active, confirmed_at, subscription_status FROM subscribers WHERE email_enc = pgp_sym_encrypt(?::text, ?)'
-      ).get(email, encKey);
+        'SELECT id, active, confirmed_at, subscription_status FROM subscribers WHERE email_hash = ?'
+      ).get(emailHash);
 
       if (existing) {
         // Block only if they have an active PAID subscription
@@ -194,20 +195,22 @@ async function subscriberRoutes(fastify) {
       const unsubscribeToken = generateToken();
       const managementToken = uuidv4();
 
+      const newEmailHash = require('crypto').createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
+
       await db.prepare(`
         INSERT INTO subscribers (
-          id, email_enc, location_city_enc, location_state_enc, location_country, zipcode_enc,
+          id, email_enc, email_hash, location_city_enc, location_state_enc, location_country, zipcode_enc,
           lat, lon, lat_enc, lon_enc, hemisphere, author_key, climate_zone_id, station_code,
           confirm_token, unsubscribe_token, management_token
         ) VALUES (
-          ?, pgp_sym_encrypt(?::text, ?), pgp_sym_encrypt(?::text, ?), pgp_sym_encrypt(?::text, ?),
+          ?, pgp_sym_encrypt(?::text, ?), ?, pgp_sym_encrypt(?::text, ?), pgp_sym_encrypt(?::text, ?),
           ?, pgp_sym_encrypt(?::text, ?),
           ?, ?, pgp_sym_encrypt(?::text, ?), pgp_sym_encrypt(?::text, ?),
           ?, ?, ?, ?, ?, ?, ?
         )
       `).run(
         id,
-        email, encKey,
+        email, encKey, newEmailHash,
         city, encKey,
         state || '', encKey,
         country,
