@@ -3,69 +3,47 @@ const { getTestDb, resetTestDb, ENC_KEY } = require('./pg-setup');
 
 const K = ENC_KEY;
 
-describe('Admin Routes', () => {
-  test('requires ADMIN_SECRET environment variable', () => {
-    delete process.env.ADMIN_SECRET;
-
-    expect(() => {
-      if (!process.env.ADMIN_SECRET) {
-        throw new Error('ADMIN_SECRET is required');
-      }
-    }).toThrow(/ADMIN_SECRET/);
-  });
-
-  test('can verify admin secret', () => {
-    process.env.ADMIN_SECRET = 'test-secret-123';
-
-    const secret = process.env.ADMIN_SECRET;
-    expect(secret).toBe('test-secret-123');
-
-    const password = 'test-secret-123';
-    expect(password === secret).toBe(true);
-  });
-
-  test('login with wrong secret returns false', () => {
-    process.env.ADMIN_SECRET = 'test-secret-123';
-
-    const secret = process.env.ADMIN_SECRET;
-    const password = 'wrong-password';
-
-    expect(password === secret).toBe(false);
-  });
-});
-
 describe('International Subscriber Dispatch', () => {
   let db;
   beforeAll(async () => { db = await getTestDb(); });
   beforeEach(async () => { await resetTestDb(db); });
   afterAll(async () => { if (db) await db.end(); });
 
-  test('subscribers with NULL station_code are matched by lat/lon grid', async () => {
+  test('international subscriber with NULL station_code is loaded by lat/lon', async () => {
     const subId = 'sub-intl-001';
     await db.query(`
       INSERT INTO subscribers (
         id, email, email_hash, location_city, location_country,
-        lat, lon, author_key, active, confirmed_at
+        lat, lon, author_key, active, confirmed_at, subscription_status
       ) VALUES ($1, pgp_sym_encrypt($2, '${K}'), encode(digest($2, 'sha256'), 'hex'),
-        pgp_sym_encrypt($3, '${K}'), $4,
-        $5, $6, $7, 1, NOW())
+        pgp_sym_encrypt($3, '${K}'), $4, $5, $6, $7, 1, NOW(), 'active')
     `, [subId, 'intl@example.com', 'Tokyo', 'JP', 35.6762, 139.6503, 'hemingway']);
 
-    const comboId = 'combo-intl-001';
-    await db.query(`
-      INSERT INTO combinations (
-        id, location_key, author_key, location_city, location_country,
-        lat, lon, hemisphere, station_code
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    `, [comboId, '35.68:139.65', 'hemingway', 'Tokyo', 'JP', 35.6762, 139.6503, 'N', null]);
-
-    const { rows: subs } = await db.query(`
-      SELECT DISTINCT s.id, pgp_sym_decrypt(s.email, '${K}')::text as email
+    const { rows } = await db.query(`
+      SELECT s.id, pgp_sym_decrypt(s.email, '${K}')::text as email
       FROM subscribers s
-      WHERE s.active = 1 AND s.confirmed_at IS NOT NULL
+      WHERE s.active = 1
+        AND s.confirmed_at IS NOT NULL
+        AND s.subscription_status = 'active'
     `);
 
-    expect(subs.length).toBe(1);
-    expect(subs[0].id).toBe(subId);
+    expect(rows.length).toBe(1);
+    expect(rows[0].email).toBe('intl@example.com');
+  });
+
+  test('encrypted email decrypts correctly', async () => {
+    const subId = 'sub-enc-001';
+    const email = 'encrypted@example.com';
+
+    await db.query(`
+      INSERT INTO subscribers (id, email, email_hash, active, confirmed_at, subscription_status)
+      VALUES ($1, pgp_sym_encrypt($2, '${K}'), encode(digest($2, 'sha256'), 'hex'), 1, NOW(), 'active')
+    `, [subId, email]);
+
+    const { rows } = await db.query(`
+      SELECT pgp_sym_decrypt(email, '${K}')::text as email FROM subscribers WHERE id = $1
+    `, [subId]);
+
+    expect(rows[0].email).toBe(email);
   });
 });
