@@ -2,14 +2,12 @@
  * Tests for beta invite system and admin auth
  */
 
-const { test, expect, describe, beforeEach, afterEach } = require('@jest/globals');
-const { initTestDb } = require('./setup');
+const { test, expect, describe, beforeAll, beforeEach, afterAll } = require('@jest/globals');
+const { getTestDb, resetTestDb, ENC_KEY } = require('./pg-setup');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 
-function getTestDb() {
-  return initTestDb(':memory:');
-}
+const K = ENC_KEY;
 
 // ── Admin auth logic (inline, matches admin.js) ───────────────────────────
 
@@ -48,13 +46,18 @@ function isBetaCode(code) {
   return typeof code === 'string' && code.startsWith('BETA-');
 }
 
-function recordBetaInvite(db, subscriberEmail, betaCode) {
-  db.prepare('UPDATE subscribers SET beta_invite = ? WHERE email = ?')
-    .run(betaCode, subscriberEmail);
+async function recordBetaInvite(db, subscriberEmail, betaCode) {
+  await db.query(
+    `UPDATE subscribers SET beta_invite = $1 WHERE email_hash = encode(digest($2, 'sha256'), 'hex')`,
+    [betaCode, subscriberEmail]
+  );
 }
 
-function getBetaSubscribers(db) {
-  return db.prepare('SELECT id, email, beta_invite FROM subscribers WHERE beta_invite IS NOT NULL').all();
+async function getBetaSubscribers(db) {
+  const { rows } = await db.query(
+    `SELECT id, pgp_sym_decrypt(email, '${K}')::text as email, beta_invite FROM subscribers WHERE beta_invite IS NOT NULL`
+  );
+  return rows;
 }
 
 // ── Admin Auth Tests ───────────────────────────────────────────────────────
@@ -64,7 +67,7 @@ describe('Admin: session token management', () => {
 
   test('generates a valid session token', () => {
     const token = generateSessionToken();
-    expect(token).toHaveLength(64); // 32 bytes hex
+    expect(token).toHaveLength(64);
     expect(validateSessionToken(token)).toBe(true);
   });
 
@@ -133,51 +136,75 @@ describe('Beta invite: code validation', () => {
 
 describe('Beta invite: DB tracking', () => {
   let db;
-  beforeEach(() => {
-    db = getTestDb();
-    db.prepare(`
-      INSERT INTO subscribers (id, email, active, confirmed_at)
-      VALUES (?, ?, 1, datetime('now'))
-    `).run(uuidv4(), 'beta@example.com');
-  });
-  afterEach(() => { if (db) db.close(); });
+  beforeAll(async () => { db = await getTestDb(); });
+  beforeEach(async () => { await resetTestDb(db); });
+  afterAll(async () => { if (db) await db.end(); });
 
-  test('records beta invite code on subscriber', () => {
-    recordBetaInvite(db, 'beta@example.com', 'BETA-B6F22');
-    const sub = db.prepare('SELECT beta_invite FROM subscribers WHERE email = ?').get('beta@example.com');
-    expect(sub.beta_invite).toBe('BETA-B6F22');
+  async function insertSubscriber(email) {
+    await db.query(`
+      INSERT INTO subscribers (id, email, email_hash, active, confirmed_at)
+      VALUES ($1, pgp_sym_encrypt($2, '${K}'), encode(digest($2, 'sha256'), 'hex'), 1, NOW())
+    `, [uuidv4(), email]);
+  }
+
+  test('records beta invite code on subscriber', async () => {
+    await insertSubscriber('beta@example.com');
+    await recordBetaInvite(db, 'beta@example.com', 'BETA-B6F22');
+    const { rows } = await db.query(
+      `SELECT beta_invite FROM subscribers WHERE email_hash = encode(digest($1, 'sha256'), 'hex')`,
+      ['beta@example.com']
+    );
+    expect(rows[0].beta_invite).toBe('BETA-B6F22');
   });
 
-  test('can query all beta subscribers', () => {
-    recordBetaInvite(db, 'beta@example.com', 'BETA-B6F22');
-    const betas = getBetaSubscribers(db);
+  test('can query all beta subscribers', async () => {
+    await insertSubscriber('beta@example.com');
+    await recordBetaInvite(db, 'beta@example.com', 'BETA-B6F22');
+    const betas = await getBetaSubscribers(db);
     expect(betas.length).toBe(1);
     expect(betas[0].email).toBe('beta@example.com');
     expect(betas[0].beta_invite).toBe('BETA-B6F22');
   });
 
-  test('non-beta subscriber not included in beta query', () => {
-    // don't call recordBetaInvite
-    const betas = getBetaSubscribers(db);
+  test('non-beta subscriber not included in beta query', async () => {
+    await insertSubscriber('beta@example.com');
+    const betas = await getBetaSubscribers(db);
     expect(betas.length).toBe(0);
   });
 
-  test('can overwrite beta invite code', () => {
-    recordBetaInvite(db, 'beta@example.com', 'BETA-FIRST');
-    recordBetaInvite(db, 'beta@example.com', 'BETA-SECOND');
-    const sub = db.prepare('SELECT beta_invite FROM subscribers WHERE email = ?').get('beta@example.com');
-    expect(sub.beta_invite).toBe('BETA-SECOND');
+  test('can overwrite beta invite code', async () => {
+    await insertSubscriber('beta@example.com');
+    await recordBetaInvite(db, 'beta@example.com', 'BETA-FIRST');
+    await recordBetaInvite(db, 'beta@example.com', 'BETA-SECOND');
+    const { rows } = await db.query(
+      `SELECT beta_invite FROM subscribers WHERE email_hash = encode(digest($1, 'sha256'), 'hex')`,
+      ['beta@example.com']
+    );
+    expect(rows[0].beta_invite).toBe('BETA-SECOND');
   });
 });
 
 describe('Gift subscription: DB schema', () => {
   let db;
-  beforeEach(() => { db = getTestDb(); });
-  afterEach(() => { if (db) db.close(); });
+  beforeAll(async () => { db = await getTestDb(); });
+  beforeEach(async () => { await resetTestDb(db); });
+  afterAll(async () => { if (db) await db.end(); });
 
-  test('gifts table exists with required columns', () => {
-    const info = db.prepare("PRAGMA table_info(gifts)").all();
-    const cols = info.map(c => c.name);
+  async function makeGifter() {
+    const id = uuidv4();
+    await db.query(`
+      INSERT INTO subscribers (id, email, email_hash, active)
+      VALUES ($1, pgp_sym_encrypt($2, '${K}'), encode(digest($2, 'sha256'), 'hex'), 1)
+    `, [id, `gifter-${id}@example.com`]);
+    return id;
+  }
+
+  test('gifts table exists with required columns', async () => {
+    const { rows } = await db.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'gifts'
+    `);
+    const cols = rows.map(r => r.column_name);
     expect(cols).toContain('id');
     expect(cols).toContain('gifter_id');
     expect(cols).toContain('recipient_email');
@@ -185,28 +212,33 @@ describe('Gift subscription: DB schema', () => {
     expect(cols).toContain('sent_at');
   });
 
-  test('can insert and retrieve a gift record', () => {
-    const gifter = uuidv4();
+  test('can insert and retrieve a gift record', async () => {
+    const gifter = await makeGifter();
     const code = `GIFT-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
-    db.prepare(`
+    await db.query(`
       INSERT INTO gifts (id, gifter_id, recipient_email, code, sent_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
-    `).run(uuidv4(), gifter, 'recipient@example.com', code);
+      VALUES ($1, $2, $3, $4, NOW())
+    `, [uuidv4(), gifter, 'recipient@example.com', code]);
 
-    const gift = db.prepare('SELECT * FROM gifts WHERE code = ?').get(code);
-    expect(gift.recipient_email).toBe('recipient@example.com');
-    expect(gift.gifter_id).toBe(gifter);
+    const { rows } = await db.query('SELECT * FROM gifts WHERE code = $1', [code]);
+    expect(rows[0].recipient_email).toBe('recipient@example.com');
+    expect(rows[0].gifter_id).toBe(gifter);
   });
 
-  test('gift code is unique', () => {
+  test('gift code is unique', async () => {
+    const gifter1 = await makeGifter();
+    const gifter2 = await makeGifter();
     const code = 'GIFT-DUPLICATE';
-    db.prepare(`INSERT INTO gifts (id, gifter_id, recipient_email, code, sent_at) VALUES (?, ?, ?, ?, datetime('now'))`)
-      .run(uuidv4(), uuidv4(), 'a@example.com', code);
 
-    expect(() => {
-      db.prepare(`INSERT INTO gifts (id, gifter_id, recipient_email, code, sent_at) VALUES (?, ?, ?, ?, datetime('now'))`)
-        .run(uuidv4(), uuidv4(), 'b@example.com', code);
-    }).toThrow();
+    await db.query(`
+      INSERT INTO gifts (id, gifter_id, recipient_email, code, sent_at)
+      VALUES ($1, $2, $3, $4, NOW())
+    `, [uuidv4(), gifter1, 'a@example.com', code]);
+
+    await expect(db.query(`
+      INSERT INTO gifts (id, gifter_id, recipient_email, code, sent_at)
+      VALUES ($1, $2, $3, $4, NOW())
+    `, [uuidv4(), gifter2, 'b@example.com', code])).rejects.toThrow();
   });
 });
