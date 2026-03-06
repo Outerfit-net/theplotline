@@ -143,6 +143,24 @@ Zone 5b: Last frost date approximately April 28.
 
 ---
 
+## ⚠️ AGENT RULES — READ FIRST
+
+**These are non-negotiable. Violating them breaks production.**
+
+1. **POSTGRES ONLY. ZERO SQLite.** The database is PostgreSQL at `postgresql://plotlines:plines2026@localhost:5432/plotlines`. There is no SQLite, no `plotlines.db`, no `better-sqlite3`, no `sqlite3` Python module, no `:memory:` anything. Not in production code. Not in tests. Not in seed scripts. Not in comments. Zero. None. If you write `import sqlite3` or `require('better-sqlite3')`, you are wrong.
+
+2. **Emails are encrypted.** The `subscribers.email` column is BYTEA (`pgp_sym_encrypt`). To read an email: `pgp_sym_decrypt(email::bytea, $1)::text`. The key is `DB_ENCRYPTION_KEY` env var (`tZF6qDVgW5JXCR2koeTy2SbepwAP+h8xKwnfRDYbNq8=`). Same for `location_city`, `location_state`, `lat_enc`, `lon_enc`, `zipcode`. Never store or log plaintext email.
+
+3. **Tests must test the real pipeline.** Tests that pass while the app is broken are worse than no tests. The test suite is `test_pipeline.py` (Python, pytest) + `__tests__/*.test.js` (Node, Jest). Both must run against real Postgres. No mocks for DB queries.
+
+4. **The Python pipeline scripts read from Postgres.** `garden-dispatch.py`, `garden-assembler.py`, `garden-mailer.py`, `garden-daily-v3.py` all use `psycopg2` to connect to Postgres. The `DATABASE_URL` and `DB_ENCRYPTION_KEY` are loaded from `/opt/plotlines/.env`.
+
+5. **Climate zones: 28 zones, exact names matter.** Old names (`alaska`, `humid_southeast`, `upper_midwest`) no longer exist in the DB or code. Use the current names listed in the Climate Zones section below. If you see an old name anywhere — in code, DB, or tests — fix it.
+
+6. **Run tests before committing.** After any change: `cd /opt/plotlines/server && npm test` and `python3 -m pytest ~/openclaw/skills/garden-conversation/test_pipeline.py -v`. Both must pass green.
+
+---
+
 ## Technical Architecture
 
 ### Infrastructure
@@ -341,9 +359,13 @@ into LLM prompts ("You garden in the Willamette Valley..."). Zone handles timing
 
 ### Database Schema
 
+**Database:** PostgreSQL 14 at `postgresql://plotlines:plines2026@localhost:5432/plotlines`
+**There is no SQLite. There has never been SQLite in production. Do not add any.**
+
+Real tables (from `\dt`): `subscribers`, `combinations`, `climate_zones`, `daily_runs`, `deliveries`, `micro_seasons`, `author_season_names`, `authors`, `mastheads`, `topic_wheel_state`, `referrals`, `gifts`, `beta_invites`
+
 ```sql
--- Subscribers
--- PostgreSQL (migrated from SQLite, 2026-03)
+-- Subscribers (actual production schema)
 CREATE TABLE subscribers (
   id                      TEXT PRIMARY KEY,
   email                   TEXT UNIQUE NOT NULL,
@@ -442,9 +464,46 @@ CREATE TABLE IF NOT EXISTS quotes (
 
 ### The Dispatch Engine
 
-```javascript
-// scripts/gardenDispatch.js
+**The Python pipeline is the production dispatch engine.** The Node.js server handles web/API/Stripe only — it does NOT send emails.
 
+**Scripts** (all in `~/openclaw/skills/garden-conversation/`):
+
+| Script | Role |
+|--------|------|
+| `garden-dispatch.py` | Orchestrator — runs the full DAG end to end |
+| `garden-assembler.py` | Assembles HTML email from dialogue + masthead |
+| `garden-mailer.py` | Sends emails via Resend |
+| `garden-daily-v3.py` | Dialogue generation — calls LLMs per character |
+| `generate_art.py` | SD 1.5 botanical art generation |
+| `generate_masthead.py` | PIL compositing — art layer + title text |
+| `garden_seasons.py` | Solar term + zone offset lookup |
+
+**All scripts connect to Postgres via `psycopg2`.** `DATABASE_URL` + `DB_ENCRYPTION_KEY` from `/opt/plotlines/.env`.
+
+**DAG stages (garden-dispatch.py):**
+1. Load combinations + subscribers from Postgres (joined query, decrypts email)
+2. Fetch weather per NWS station (cached per run-date)
+3. Generate art per zone+condition (SD 1.5, cached by hash)
+4. Generate dialogue per combo (LLMs, cached per run-date)
+5. Generate title (mistral:latest, 30s timeout, fallback dict)
+6. Composite masthead (PIL, art layer + text)
+7. Assemble HTML email
+8. Send via Resend, record in `deliveries` table
+
+**Cron:** 5:30 AM Mountain daily via OpenClaw cron.
+
+**Run manually:**
+```bash
+cd ~/openclaw/skills/garden-conversation
+python3 garden-dispatch.py --dry-run        # test without sending
+python3 garden-dispatch.py                  # real run
+python3 garden-dispatch.py --date 2026-03-06  # specific date
+```
+
+**Legacy pseudocode (IGNORE — this is NOT how it works):**
+```javascript
+// THIS IS OLD. DO NOT IMPLEMENT. The real engine is Python.
+// Kept for concept reference only.
 import cron from 'node-cron'
 import { generateConversation } from './gardenConversation.js'  // existing script
 
@@ -755,8 +814,60 @@ Each new author voice is a marketing event.
 
 ## Test Coverage
 
-**Run tests:** `cd /opt/plotlines/server && npm test`
-**Current:** 10 suites, ~230 tests (63 climate tests), 1 unrelated failure (webhook geocoding)
+**The goal:** When tests are green, running the DAG works. Period.
+
+**Run all tests:**
+```bash
+# Node.js (API, webhooks, climate zones, geocoding)
+cd /opt/plotlines/server && npm test
+
+# Python (pipeline integration — hits real Postgres, real APIs)
+python3 -m pytest ~/openclaw/skills/garden-conversation/test_pipeline.py -v
+```
+
+**Both must pass before any commit.**
+
+### Node.js tests (`/opt/plotlines/server/__tests__/`)
+
+All tests run against **real Postgres** (`plotlines_test` DB). Zero SQLite. Zero mocks for DB.
+
+| Suite | What it tests |
+|-------|--------------|
+| `climate.test.js` | Zone assignment, all 28 zones, boundary conditions |
+| `geocode-validation.test.js` | Key West, Juneau, Alaska zones correct |
+| `location-outliers.test.js` | Extreme locations: Barrow, international cities |
+| `zip-coverage.test.js` | Real lat/lon per zip — sampled US coverage |
+| `webhook-zipcode-backfill.test.js` | Stripe backfill: 4 combinations (needsZip × needsGeo) |
+| `stripe-webhook.test.js` | Webhook events: checkout, cancel, payment |
+| `admin.test.js` | Admin KPIs, international dispatch |
+| `beta-invite.test.js` | Beta invite tracking |
+
+### Python integration tests (`test_pipeline.py`)
+
+Tests that verify the actual pipeline stages work:
+
+| Test | What it proves |
+|------|---------------|
+| DB connectivity | Postgres reachable, combinations exist, zones valid |
+| Zone lookup | Every combo's lat/lon resolves to a valid 28-zone name |
+| Solar term | `get_current_solar_term()` works for all 28 zones, zone-aware |
+| Weather | NWS fetch returns valid condition for each station |
+| Art generation | SD 1.5 produces a valid PNG > 10KB |
+| Dialogue | LLM returns dialogue > 100 chars |
+| Masthead | PIL composites a valid PNG |
+| Full dry-run | `garden-dispatch.py --dry-run` exits 0, sent ≥ 1 |
+| Email decryption | All active subscriber emails decrypt to valid addresses |
+
+### What green means
+
+If both test suites are green:
+- Postgres has valid data (zones, combinations, subscribers)
+- Weather API is reachable and returning real data
+- Ollama is running and models are loaded
+- Art pipeline produces real images
+- Emails will actually reach subscribers
+
+**Current state:**
 
 **Test philosophy:** Tests must use real coordinates and real assertions.
 Never hardcode math like `(33791/33791)*100 > 85` — that tests nothing.
