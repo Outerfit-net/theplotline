@@ -6,6 +6,8 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { sendEmail } = require('../services/email');
+const { geocodeWithRetry: geocode } = require('../services/geocode');
+const { assignClimateZone } = require('../services/climate');
 
 // Helper to HTML-escape strings for XSS prevention
 function htmlEscape(str) {
@@ -492,6 +494,34 @@ If you're not interested, you can ignore this email.
               endDate.toISOString().split('T')[0],
               subscriberId
             );
+
+            // ── Backfill zipcode + re-geocode from Stripe billing address if not provided ──
+            const postalCode = session.customer_details?.address?.postal_code;
+            if (postalCode) {
+              const existing = await db.prepare('SELECT zipcode, lat, lon FROM subscribers WHERE id = ?').get(subscriberId);
+              const needsZip = !existing?.zipcode;
+              const needsGeo = !existing?.lat;
+
+              if (needsZip || needsGeo) {
+                await db.prepare(`
+                  UPDATE subscribers SET zipcode = COALESCE(NULLIF(zipcode,''), ?) WHERE id = ?
+                `).run(postalCode, subscriberId);
+
+                // Re-geocode using zipcode for precision
+                try {
+                  const geo = await geocode(postalCode, 'US');
+                  if (geo) {
+                    const zoneId = assignClimateZone(geo.lat, geo.lon, 'US');
+                    await db.prepare(`
+                      UPDATE subscribers SET lat = ?, lon = ?, climate_zone_id = ? WHERE id = ?
+                    `).run(geo.lat, geo.lon, zoneId, subscriberId);
+                    fastify.log.info(`[webhook] geocoded zip ${postalCode} → ${geo.lat},${geo.lon} zone=${zoneId} for ${subscriberId}`);
+                  }
+                } catch (geoErr) {
+                  fastify.log.warn(`[webhook] geocode failed for zip ${postalCode}:`, geoErr.message);
+                }
+              }
+            }
 
             // Handle referral reward if ref was provided in checkout metadata
             if (ref) {
