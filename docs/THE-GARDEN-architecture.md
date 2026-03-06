@@ -376,3 +376,71 @@ bw get notes "PlotLines Backup GPG Key" | gpg --import
 rclone copy outerfit-backups:outerfit-llc/plotlines/plotlines_DATE.sql.gz.gpg /tmp/
 gpg --decrypt /tmp/plotlines_DATE.sql.gz.gpg | gunzip | PGPASSWORD=plines2026 psql -h localhost -U plotlines plotlines
 ```
+
+---
+
+## Characters & Models
+
+Each character is an OpenClaw agent with a dedicated model and persona file. Not all appear every day — rotation managed in `garden-dialogue.py`.
+
+| Key | Name | Model | Persona File |
+|-----|------|-------|-------------|
+| `buckthorn` | Buck Thorn | claude-sonnet-4-6 | `persona-buckthorn.md` |
+| `harry-kvetch` | Harry Kvetch | claude-haiku-4-5 | `persona-harry-kvetch.md` |
+| `miss-canthus` | Ms. Canthus | claude-haiku-4-5 | `persona-miss-canthus.md` |
+| `poppy-seed` | Poppy Seed | claude-opus-4-5 | `persona-poppy-seed.md` |
+| `ivy-league` | Ivy League | claude-opus-4-6 | `persona-ivy-league.md` |
+| `chelsea-flower` | Chelsea Flower | claude-sonnet-4-5 | `persona-chelsea-flower.md` |
+| `buster-native` | Buster Native | claude-opus-4-5 | `persona-buster-native.md` |
+| `fern` | Fern Young | claude-sonnet-4-5 | `persona-fern.md` |
+| `esther-potts` | Esther Potts | claude-haiku-4-5 | `persona-esther-potts.md` |
+| `herb-berryman` | Herb Berryman | claude-sonnet-4-6 | `persona-herb-berryman.md` |
+| `muso-maple` | Muso Maple | claude-haiku-4-5 | `persona-muso-maple.md` |
+| `edie-bell` | Edie Bell | claude-sonnet-4-6 | `persona-edie-bell.md` |
+
+Characters are invoked via: `openclaw agent --agent <key> --session-id <sid>`
+
+---
+
+## Lookup Files & Data Sources
+
+All static lookup data used by the pipeline.
+
+| File / Source | Content | Used By |
+|---------------|---------|---------|
+| `authors.json` | 15 author voice style prompts keyed by author_key | `garden-dialogue.py` |
+| `persona-*.md` (12 files) | Character soul/personality for each cast member | `garden-dialogue.py` |
+| `garden_seasons.py: SOLAR_TERMS` | 24 solar terms — id, name, date, season_bucket, description | `garden_seasons.py` |
+| `garden_seasons.py: ZONE_OFFSETS` | Day offsets per zone per season (28 zones) | `garden_seasons.py` |
+| `garden_seasons.py: SUB_REGION_ZONES` | ~100 sub-regions → climate_zone_id mapping | `garden_seasons.py` |
+| `topic_bank_24.py: TOPIC_BANK_24` | Topics keyed by solar term name (current) ⚠️ TODO: expand to (season_bucket, climate_zone_id) | `garden-dialogue.py` |
+| `DB: climate_zones` | 28 climate zone ids + names | All pipeline scripts |
+| `DB: micro_seasons` | Micro-seasons per zone (12 or 72 depending on zone) | `garden-dialogue.py` |
+| `DB: authors` | Author keys + metadata | `garden-dialogue.py` |
+| `DB: combinations` | location_key + author_key + lat/lon + station_code + zone | `garden-dispatch.py` |
+| `DB: quotes` ⚠️ TODO | 336 quotes keyed by season_bucket (14 per term) | `garden-quotes.py` (TODO) |
+| `DB: quote_usage` ⚠️ TODO | Tracks quote usage per run_date for non-repeat logic | `garden-quotes.py` (TODO) |
+| `DB: title_dict` ⚠️ TODO | Pre-generated titles per (season_bucket, climate_zone_id, condition) | `title_dict.py` (TODO) |
+| `solar-terms.md` / `SEKKI.md` | Reference docs for 24 solar terms | Documentation only |
+| `garden-context-cache.json` | Cached garden context descriptions per location | `garden-dialogue.py` |
+
+---
+
+## Script → Pipeline Stage Mapping
+
+| Script | Stage | Inputs | Outputs |
+|--------|-------|--------|---------|
+| `garden-weather.py` | Weather | `(station_code, zipcode)` | `{condition, forecast}` |
+| `garden_seasons.py` | Solar Term | `(climate_zone_id, zone_offset)` | `{season_bucket, season_bucket_description}` |
+| `server/services/sub-regions.js` | Sub-region | `(station_code, climate_zone_id)` | `{sub_region_description}` |
+| `topic_bank_24.py` ⚠️ TODO | Topic | `(season_bucket, climate_zone_id)` | `{topic}` |
+| `garden-quotes.py` ⚠️ TODO: doesn't exist | Quote | `(season_bucket)` | `{quote}` |
+| `generate_art.py` | Art | `({condition, season_bucket, season_bucket_description})` | `{png_path}` |
+| `generate_masthead.py` | Masthead | `({png_path, title})` | `{url}` |
+| `title_dict.py` ⚠️ TODO: doesn't exist | Title Dict | `(season_bucket, climate_zone_id, condition)` | `{title}` |
+| `authors.json` | Author Voice | `(author_key)` | `{style_prompt}` |
+| `persona-*.md` | Character Souls | `(character_key)` | `{character_soul}` |
+| `garden-dialogue.py` | Dialogue | `(author_key, {forecast, season_bucket_description, sub_region_description, topic, quote, style_prompt, character_souls})` | `{prose}` |
+| `garden-assembler.py` | Email Template | `({url, prose, quote, unsubscribe_token})` | `{html}` |
+| `garden-mailer.py` | Delivery | `(email_address, {html})` | `email sent` |
+| `garden-dispatch.py` | Orchestrator | all of the above | coordinates full DAG |
