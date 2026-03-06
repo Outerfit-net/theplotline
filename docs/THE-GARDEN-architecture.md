@@ -444,3 +444,52 @@ All static lookup data used by the pipeline.
 | `garden-assembler.py` | Email Template | `({url, prose, quote, unsubscribe_token})` | `{html}` |
 | `garden-mailer.py` | Delivery | `(email_address, {html})` | `email sent` |
 | `garden-dispatch.py` | Orchestrator | all of the above | coordinates full DAG |
+
+---
+
+## Dialogue — History, Memory & Archive
+
+⚠️ **TODO: This section describes current implementation. Needs review and improvement — see TODOs below.**
+
+### Where History Lives
+
+Archive files live at: `~/.openclaw/workspace-garden/memory/<afd_station>/<author_key>/YYYY-MM-DD.md`
+
+One file per day per `(station, author)` combination. Written after each successful dialogue run.
+
+Each archive file contains:
+- `**Topic:**` — that day's topic
+- `**Quote:**` — that day's quote
+- `**Characters:**` — which characters participated
+- Weather summary
+- Full prose output
+
+### What Gets Included in the Prompt
+
+Two types of history are injected at prompt time:
+
+**1. Topic/Quote dedup (`read_archive_memory`)** — last 7 days
+- Reads ONLY `**Topic:**` and `**Quote:**` lines from each archive file
+- Injected into `generate_topic()` prompt to prevent repeats
+- Lightweight — just the metadata lines, not full prose
+
+**2. Character memory (`read_character_memory`)** — last 7 days
+- Reads the FULL archive file content for each character's past conversations
+- Injected into each character's prompt at bootstrap and each turn
+- Enables callbacks: "Like I said before...", "Remember when we talked about..."
+- Can be large — 7 days × full prose per day
+
+### How Archive is Written
+
+After dialogue completes, `write_archive()` writes a single `.md` file with:
+- Topic, quote, character list
+- Weather summary
+- Full prose output
+
+### TODOs
+
+- **Archive lives outside the repo** (`~/.openclaw/workspace-garden/`) — not backed up, not version controlled. Should be stored in Postgres `daily_runs` table (already exists) and served from there.
+- **7 days of full prose in every character prompt** — expensive. Should summarize or truncate older entries.
+- **No per-character memory** — every character gets the same full archive. Should be filtered to conversations that character actually participated in.
+- **`read_character_memory` loads full prose** — at 7 days this can be 10K+ tokens per character before the conversation even starts. Needs a cap or summarization step.
+- **Archive path uses `afd_station`** — should use `(station_code, author_key)` to match master query grain.
