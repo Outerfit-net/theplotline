@@ -88,7 +88,7 @@ const ZONE_OFFSETS = {
 // Tropical zones use seasonal names instead of 24 solar terms
 const TROPICAL_SEASONS = {
   hawaii: (month) => (month >= 5 && month <= 10) ? "Dry Season (Kau)" : "Wet Season (Ho'oilo)",
-  florida_keys_tropical: (month) => (month >= 6 && month <= 11) ? 'Hurricane Season' : 'Dry Season',
+  florida_keys_tropical: (month) => (month >= 6 && month <= 11) ? 'Wet Season' : 'Dry Season',
   australia_tropical: (month) => (month >= 11 || month <= 3) ? 'Wet Season' : 'Dry Season',
 };
 
