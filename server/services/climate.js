@@ -2,6 +2,12 @@
  * Climate zone assignment
  * Assigns a subscriber to a climate zone based on lat/lon
  * Uses Köppen-inspired bounding box logic — good enough, not meteorologically perfect
+ * 
+ * Updated 2026-03-06: Expanded from 16 to 28 zones
+ * - Great Lakes split from upper_midwest
+ * - Hawaii, Florida Keys, Desert Southwest added
+ * - Alaska split into interior/coastal
+ * - International zones added (Japan, Iceland, South Africa, Brazil)
  */
 
 // Zone definitions with bounding boxes and priority order
@@ -11,12 +17,22 @@ const ZONE_RULES = [
   {
     id: 'australia_tropical',
     test: (lat, lon, country) =>
-      country === 'AU' && lat > -20,
+      country === 'AU' && lat > -22,
   },
   {
     id: 'australia_temperate',
     test: (lat, lon, country) =>
-      country === 'AU' && lat <= -20,
+      country === 'AU' && lat <= -22,
+  },
+  {
+    id: 'south_africa_subtropical',
+    test: (lat, lon, country) =>
+      country === 'ZA' && lat > -26,
+  },
+  {
+    id: 'south_africa_temperate',
+    test: (lat, lon, country) =>
+      country === 'ZA' && lat <= -26,
   },
 
   // ── UK & IRELAND ──────────────────────────────────────────────────────────
@@ -40,12 +56,31 @@ const ZONE_RULES = [
        'DK', 'SE', 'NO', 'FI', 'EE', 'LV', 'LT'].includes(country) ||
       (country === 'FR' && lat >= 44),
   },
+  {
+    id: 'iceland_subarctic',
+    test: (lat, lon, country) =>
+      country === 'IS',
+  },
+
+  // ── ASIA ───────────────────────────────────────────────────────────────────
+  {
+    id: 'japan_temperate',
+    test: (lat, lon, country) =>
+      country === 'JP',
+  },
+
+  // ── SOUTH AMERICA ──────────────────────────────────────────────────────────
+  {
+    id: 'brazil_subtropical',
+    test: (lat, lon, country) =>
+      country === 'BR',
+  },
 
   // ── CANADA ────────────────────────────────────────────────────────────────
   {
     id: 'canada_prairie',
     test: (lat, lon, country) =>
-      country === 'CA' && lon >= -115 && lon <= -95 && lat >= 49,
+      country === 'CA' && lon >= -120 && lon <= -95 && lat >= 49,
   },
   {
     id: 'canada_maritime',
@@ -54,55 +89,117 @@ const ZONE_RULES = [
   },
 
   // ── UNITED STATES ─────────────────────────────────────────────────────────
-  // Alaska: lat > 54 catches all of AK including Southeast (Juneau ~58.3°N)
+  // ALASKA (split: interior + coastal)
   {
-    id: 'alaska',
+    id: 'alaska_interior',
     test: (lat, lon, country) =>
-      country === 'US' && lat >= 54,
+      country === 'US' && lat >= 62 && lat <= 66 && lon >= -165 && lon <= -141,
   },
-  // Pacific Maritime: West Coast north of ~37°N
+  {
+    id: 'alaska_south_coastal',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 58 && lat <= 62 && lon >= -150 && lon <= -130,
+  },
+
+  // PACIFIC COAST
   {
     id: 'pacific_maritime',
     test: (lat, lon, country) =>
-      country === 'US' && lon <= -116 && lat >= 37 && lat <= 50,
+      country === 'US' && lon <= -116 && lat >= 42 && lat <= 50,
   },
-  // California Mediterranean: CA inland + coast south of 37°N
+
+  // CALIFORNIA
   {
     id: 'california_med',
     test: (lat, lon, country) =>
-      country === 'US' && lon <= -114 && lat < 40 && lat > 32,
+      country === 'US' && lon <= -114 && lat >= 32 && lat <= 42,
   },
-  // High Plains / Intermountain: CO, WY, MT, ID, UT, NV, NM, AZ (non-desert)
+
+  // INTERMOUNTAIN & HIGH PLAINS
   {
     id: 'high_plains',
     test: (lat, lon, country) =>
-      country === 'US' && lon >= -116 && lon <= -100 && lat >= 31 && lat <= 49,
+      country === 'US' && lat >= 31 && lat <= 49 && lon >= -116 && lon <= -102,
   },
-  // Appalachian / Mid-Atlantic (check before humid_southeast — overlapping region)
+
+  // DESERT SOUTHWEST (new — separated from high_plains)
+  {
+    id: 'desert_southwest',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 31 && lat <= 40 && lon >= -114 && lon <= -109,
+  },
+
+  // GREAT PLAINS (redefined — no overlap with high_plains)
+  {
+    id: 'great_plains',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 32 && lat <= 48 && lon >= -102 && lon <= -95,
+  },
+
+  // GREAT LAKES (new — split from upper_midwest)
+  {
+    id: 'great_lakes',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 41 && lat <= 46 && lon >= -90 && lon <= -82,
+  },
+
+  // UPPER MIDWEST CONTINENTAL (redefined — narrower, no Great Lakes)
+  {
+    id: 'upper_midwest_continental',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 41 && lat <= 49 && lon >= -99 && lon <= -89,
+  },
+
+  // APPALACHIAN / MID-ATLANTIC
   {
     id: 'appalachian',
     test: (lat, lon, country) =>
-      country === 'US' && lat >= 35 && lat <= 42 && lon >= -84 && lon <= -78,
+      country === 'US' && lat >= 35 && lat <= 42 && lon >= -85 && lon <= -78,
   },
-  // Humid Southeast
-  {
-    id: 'humid_southeast',
-    test: (lat, lon, country) =>
-      country === 'US' && lat < 37 && lon >= -100,
-  },
-  // Upper Midwest
-  {
-    id: 'upper_midwest',
-    test: (lat, lon, country) =>
-      country === 'US' && lat >= 41 && lat <= 49 && lon >= -97 && lon <= -80,
-  },
-  // Northeast
+
+  // NORTHEAST
   {
     id: 'northeast',
     test: (lat, lon, country) =>
-      country === 'US' && lat >= 37 && lat <= 47 && lon >= -84,
+      country === 'US' && lat >= 40 && lat <= 47 && lon >= -75 && lon <= -66,
   },
-  // Great Plains (catch-all for central US)
+
+  // HUMID SUBTROPICAL (redefined — excludes South Florida)
+  {
+    id: 'humid_subtropical',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 25 && lat <= 36 && lon >= -90 && lon <= -75,
+  },
+
+  // SOUTHERN PLAINS / RIO GRANDE (new)
+  {
+    id: 'southern_plains',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 25 && lat <= 31 && lon >= -100 && lon <= -95,
+  },
+
+  // FLORIDA SOUTHERN TROPICAL (new — wet/dry seasons)
+  {
+    id: 'florida_southern',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 24 && lat <= 28 && lon >= -82 && lon <= -80,
+  },
+
+  // FLORIDA KEYS TROPICAL (new — frost-free, trade winds)
+  {
+    id: 'florida_keys_tropical',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 24 && lat <= 25.5 && lon >= -82 && lon <= -80.5,
+  },
+
+  // HAWAII (new — trade winds, tropical)
+  {
+    id: 'hawaii',
+    test: (lat, lon, country) =>
+      country === 'US' && lat >= 19 && lat <= 23 && lon >= -160 && lon <= -155,
+  },
+
+  // CATCH-ALL (should rarely be needed)
   {
     id: 'great_plains',
     test: (lat, lon, country) =>
