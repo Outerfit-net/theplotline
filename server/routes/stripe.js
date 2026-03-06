@@ -45,7 +45,12 @@ async function stripeRoutes(fastify) {
         email: subscriber.email,
         plan: subscriber.plan,
         status: subscriber.subscription_status,
-        subscription_end_date: subscriber.subscription_end_date
+        subscription_end_date: subscriber.subscription_end_date,
+        author: subscriber.author_key,
+        city: subscriber.location_city,
+        state: subscriber.location_state,
+        country: subscriber.location_country,
+        zipcode: subscriber.zipcode
       });
     } catch (error) {
       fastify.log.error(error);
@@ -90,7 +95,9 @@ async function stripeRoutes(fastify) {
       // Update subscription status in DB only after Stripe succeeds
       await db.prepare(`
         UPDATE subscribers
-        SET subscription_status = 'canceled'
+        SET subscription_status = 'canceled',
+            active = NULL,
+            cancelled_at = NOW()
         WHERE id = ?
       `).run(subscriber.id);
 
@@ -116,7 +123,7 @@ async function stripeRoutes(fastify) {
     const db = fastify.db;
     try {
       const subscriber = await db.prepare(`
-        SELECT id, email FROM subscribers
+        SELECT id, email, plan FROM subscribers
         WHERE email = ? AND management_token = ?
         LIMIT 1
       `).get(email, token);
@@ -124,6 +131,9 @@ async function stripeRoutes(fastify) {
       if (!subscriber) {
         return reply.code(401).send({ error: 'Invalid email or token' });
       }
+
+      // Referral: if weekly → weekly, if annual/monthly → monthly (max 1 month free)
+      const referrerPlan = (subscriber.plan === 'weekly') ? 'weekly' : 'monthly';
 
       // Check if referral code already exists
       let referralRow = await db.prepare('SELECT code FROM referrals WHERE referrer_id = ?').get(subscriber.id);
@@ -142,7 +152,8 @@ async function stripeRoutes(fastify) {
 
       return reply.send({
         code,
-        url: `${process.env.CLIENT_URL}/?ref=${code}`
+        plan: referrerPlan,
+        url: `${process.env.CLIENT_URL}/?ref=${code}&plan=${referrerPlan}`
       });
     } catch (error) {
       fastify.log.error(error);
@@ -301,18 +312,43 @@ If you're not interested, you can ignore this email.
 
   // ── POST /api/stripe/create-checkout ──────────────────────────────────────
   fastify.post('/stripe/create-checkout', async (request, reply) => {
-    const { email, plan, subscriberId } = request.body;
+    const { email, plan, subscriberId, promoCode } = request.body;
 
     if (!email || !plan) {
       return reply.code(400).send({ error: 'Missing required fields: email, plan' });
     }
 
-    if (!['weekly', 'monthly'].includes(plan)) {
-      return reply.code(400).send({ error: 'Invalid plan: must be weekly or monthly' });
+    if (!['weekly', 'monthly', 'annual'].includes(plan)) {
+      return reply.code(400).send({ error: 'Invalid plan: must be weekly, monthly, or annual' });
     }
 
     const db = fastify.db;
     try {
+      // If promoCode is a referral code (starts with REF-), enforce the referrer's plan
+      if (promoCode && promoCode.startsWith('REF-')) {
+        const referral = await db.prepare(`
+          SELECT r.referrer_id, s.plan
+          FROM referrals r
+          JOIN subscribers s ON r.referrer_id = s.id
+          WHERE r.code = ? AND r.redeemed_at IS NULL
+          LIMIT 1
+        `).get(promoCode);
+
+        if (referral && referral.plan) {
+          // Use referrer's plan
+          plan = referral.plan;
+        }
+      }
+
+      // Look up subscriber by email if no subscriberId provided
+      let resolvedSubscriberId = subscriberId;
+      if (!resolvedSubscriberId) {
+        const sub = await db.prepare('SELECT id FROM subscribers WHERE email = ? LIMIT 1').get(email);
+        if (sub) {
+          resolvedSubscriberId = sub.id;
+        }
+      }
+
       // Get or create Stripe customer
       let stripeCustomerId;
       let customer = await stripe.customers.list({ email, limit: 1 });
@@ -322,24 +358,29 @@ If you're not interested, you can ignore this email.
       } else {
         customer = await stripe.customers.create({ email });
         stripeCustomerId = customer.id;
+      }
 
-        // Store in DB if subscriber exists
-        if (subscriberId) {
-          await db.prepare('UPDATE subscribers SET stripe_customer_id = ? WHERE id = ?').run(stripeCustomerId, subscriberId);
-        }
+      // Store Stripe customer ID in DB if subscriber exists
+      if (resolvedSubscriberId) {
+        await db.prepare('UPDATE subscribers SET stripe_customer_id = ? WHERE id = ?').run(stripeCustomerId, resolvedSubscriberId);
       }
 
       // Get price ID from environment
-      const priceId = plan === 'weekly'
-        ? process.env.STRIPE_PRICE_WEEKLY
-        : process.env.STRIPE_PRICE_MONTHLY;
+      let priceId;
+      if (plan === 'weekly') {
+        priceId = process.env.STRIPE_PRICE_WEEKLY;
+      } else if (plan === 'monthly') {
+        priceId = process.env.STRIPE_PRICE_MONTHLY;
+      } else if (plan === 'annual') {
+        priceId = process.env.STRIPE_PRICE_ANNUAL;
+      }
 
       if (!priceId) {
         return reply.code(500).send({ error: `Missing STRIPE_PRICE_${plan.toUpperCase()}` });
       }
 
-      // Create checkout session
-      const checkoutSession = await stripe.checkout.sessions.create({
+      // Build checkout session options
+      const sessionParams = {
         customer: stripeCustomerId,
         payment_method_types: ['card'],
         line_items: [
@@ -352,10 +393,34 @@ If you're not interested, you can ignore this email.
         success_url: `${process.env.CLIENT_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.CLIENT_URL}/cancel`,
         metadata: {
-          subscriberId: subscriberId || '',
+          subscriberId: resolvedSubscriberId || '',
           plan,
         },
-      });
+      };
+
+      // Apply promo code if provided
+      if (promoCode) {
+        try {
+          // Look up the promotion code by its code
+          const promotionCodes = await stripe.promotionCodes.list({
+            code: promoCode,
+            limit: 1,
+            active: true,
+          });
+
+          if (promotionCodes.data.length > 0) {
+            sessionParams.discounts = [{
+              promotion_code: promotionCodes.data[0].id,
+            }];
+          }
+        } catch (promoError) {
+          fastify.log.warn('Failed to apply promo code:', promoError.message);
+          // Continue without discount if promo code is invalid
+        }
+      }
+
+      // Create checkout session
+      const checkoutSession = await stripe.checkout.sessions.create(sessionParams);
 
       return reply.send({ url: checkoutSession.url });
     } catch (error) {
@@ -406,7 +471,7 @@ If you're not interested, you can ignore this email.
 
           if (subscriberId) {
             const endDate = new Date();
-            endDate.setDate(endDate.getDate() + (plan === 'monthly' ? 30 : 7));
+            endDate.setDate(endDate.getDate() + (plan === 'annual' ? 365 : plan === 'monthly' ? 30 : 7));
 
             await db.prepare(`
               UPDATE subscribers
@@ -414,7 +479,9 @@ If you're not interested, you can ignore this email.
                   stripe_subscription_id = ?,
                   plan = ?,
                   subscription_status = ?,
-                  subscription_end_date = ?
+                  subscription_end_date = ?,
+                  confirmed_at = COALESCE(confirmed_at, NOW()),
+                  confirm_token = NULL
               WHERE id = ?
             `).run(
               session.customer,
@@ -468,7 +535,7 @@ If you're not interested, you can ignore this email.
 
           if (subscriber) {
             const endDate = new Date();
-            endDate.setDate(endDate.getDate() + (subscriber.plan === 'monthly' ? 30 : 7));
+            endDate.setDate(endDate.getDate() + (subscriber.plan === 'annual' ? 365 : subscriber.plan === 'monthly' ? 30 : 7));
 
             await db.prepare('UPDATE subscribers SET subscription_end_date = ? WHERE id = ?').run(endDate.toISOString().split('T')[0], subscriber.id);
           }
@@ -489,7 +556,13 @@ If you're not interested, you can ignore this email.
           const subscription = event.data.object;
           const customerId = subscription.customer;
 
-          await db.prepare('UPDATE subscribers SET subscription_status = ? WHERE stripe_customer_id = ?').run('canceled', customerId);
+          await db.prepare(`
+            UPDATE subscribers
+            SET subscription_status = 'canceled',
+                active = NULL,
+                cancelled_at = NOW()
+            WHERE stripe_customer_id = ?
+          `).run(customerId);
           break;
         }
 
@@ -502,6 +575,65 @@ If you're not interested, you can ignore this email.
     } catch (error) {
       fastify.log.error('Webhook processing error:', error);
       return reply.code(500).send({ error: 'Webhook processing failed' });
+    }
+  });
+
+  // ── POST /api/subscription/update ─────────────────────────────────────────
+  fastify.post('/subscription/update', async (request, reply) => {
+    const { email, token, author, city, state, country, zipcode } = request.body;
+
+    if (!email || !token) {
+      return reply.code(400).send({ error: 'Missing required fields: email, token' });
+    }
+
+    const db = fastify.db;
+    try {
+      const subscriber = await db.prepare(`
+        SELECT id FROM subscribers
+        WHERE email = ? AND management_token = ?
+        LIMIT 1
+      `).get(email, token);
+
+      if (!subscriber) {
+        return reply.code(401).send({ error: 'Invalid email or token' });
+      }
+
+      // Build update query dynamically
+      const updates = [];
+      const params = [];
+      
+      if (author !== undefined) {
+        updates.push('author_key = ?');
+        params.push(author);
+      }
+      if (city !== undefined) {
+        updates.push('location_city = ?');
+        params.push(city);
+      }
+      if (state !== undefined) {
+        updates.push('location_state = ?');
+        params.push(state);
+      }
+      if (country !== undefined) {
+        updates.push('location_country = ?');
+        params.push(country);
+      }
+      if (zipcode !== undefined) {
+        updates.push('zipcode = ?');
+        params.push(zipcode);
+      }
+
+      if (updates.length > 0) {
+        params.push(subscriber.id);
+        await db.prepare(`
+          UPDATE subscribers SET ${updates.join(', ')} WHERE id = ?
+        `).run(...params);
+      }
+
+      return reply.send({ success: true, message: 'Settings updated' });
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.code(500).send({ error: 'Failed to update settings' });
     }
   });
 }
