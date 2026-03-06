@@ -247,6 +247,7 @@ async function subscriberRoutes(fastify) {
     const db = fastify.db;
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
 
+    const he = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     const htmlPage = (title, message) => `
       <!DOCTYPE html>
       <html>
@@ -265,9 +266,9 @@ async function subscriberRoutes(fastify) {
       <body>
         <div class="container">
           <div class="emoji">${title.includes('Confirmed') ? '✅' : '🌿'}</div>
-          <h1>${title}</h1>
-          <p>${message}</p>
-          <p style="margin-top: 24px;"><a href="${clientUrl}">Return to The Plot Line</a></p>
+          <h1>${he(title)}</h1>
+          <p>${he(message)}</p>
+          <p style="margin-top: 24px;"><a href="${he(clientUrl)}">Return to The Plot Line</a></p>
         </div>
       </body>
       </html>

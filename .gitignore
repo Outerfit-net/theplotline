@@ -54,3 +54,6 @@ coverage/
 *.bak
 *.tmp
 .cache/
+test.json
+test.json
+test.json.enc

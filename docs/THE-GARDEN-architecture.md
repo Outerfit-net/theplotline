@@ -1,6 +1,6 @@
 # THE GARDEN — Architecture & Business Plan
 
-*Last Updated: 2026-02-25*
+*Last Updated: 2026-03-06*
 *Infrastructure: Shared with Outerfit LLC (outerfit.net VPS)*
 
 ---
@@ -179,24 +179,57 @@ For each active location+author combo:
 
 **Plans:**
 - Weekly: $1.99/week
-- Daily: $3.99/day
+- Monthly: $3.99/month
+- Annual: $40/year
 
 **Flow:**
 1. User subscribes via `/api/subscribe` → gets confirmation email with token
 2. Confirms email → status changes to 'active' (unconfirmed → active)
 3. User clicks "Subscribe" → `/api/stripe/create-checkout` → Stripe Checkout session
-4. Stripe webhook `/api/stripe/webhook` receives:
-   - `checkout.session.completed` → activate subscription
-   - `customer.subscription.updated` → sync status
+4. Stripe webhook `/api/webhooks/stripe` receives:
+   - `checkout.session.completed` → activate subscription, backfill zipcode + re-geocode if missing
+   - `invoice.paid` → extend subscription_end_date
    - `customer.subscription.deleted` → cancel subscription
    - `invoice.payment_failed` → mark as past_due
 5. Referral: user enters referral code at signup → referrer gets free month on referee's first payment
 6. Gift: purchaser buys gift code → recipient gets email with code → redeems for free subscription period
 
+**Zipcode Backfill (webhook):**
+On `checkout.session.completed`, if the subscriber has no zipcode or no lat/lon, we pull
+`customer_details.address.postal_code` from the Stripe session and:
+- Store the zipcode
+- Re-geocode using the zip (more precise than city+state)
+- Update lat/lon and climate_zone_id
+This ensures subscribers who skip the optional zip field still get correctly zoned.
+
 **Beta Invite System:**
 - Beta codes (`BETA-*`) bypass payment during checkout
 - Used for early access, press, friends & family
 - Tracked in `beta_invite` field on subscriber
+
+### Location & Climate Zone Resolution
+
+**Signup flow:**
+1. User provides city + state (required for US) + optional zipcode
+2. Geocode: zipcode preferred (more precise) → fallback to `"city, state"` via Nominatim
+3. `assignClimateZone(lat, lon, country)` → `climate_zone_id` (e.g. `high_plains`, `humid_southeast`, `alaska`)
+4. US: NWS station lookup for hyper-local weather
+
+**Climate zones** (`server/services/climate.js`):
+`alaska` | `pacific_maritime` | `california_med` | `high_plains` | `appalachian` |
+`humid_southeast` | `upper_midwest` | `northeast` | `great_plains` | `uk_maritime` |
+`mediterranean_eu` | `central_europe` | `canada_prairie` | `canada_maritime` | `australia_tropical` | `australia_temperate`
+
+**Sub-region lookup** (`server/services/sub-regions.js`):
+Two-pass: lat/lon bounding boxes → NWS station code fallback.
+104 sub-regions → 16 climate zones. Coverage: all US states including Alaska (SE box lon -140→-129)
+and Florida Keys (fl_southern extended to lat 24.4).
+
+**Admin KPI date semantics:**
+- `created_at` — immutable, original signup timestamp
+- `confirmed_at` — set once on first email confirmation
+- `subscribed_at` — updated on every reactivation; used for "New today" KPI
+- `unsubscribed_at` / `cancelled_at` — set on cancel
 
 ### Database Schema
 
@@ -218,8 +251,9 @@ CREATE TABLE subscribers (
   climate_zone_id         TEXT REFERENCES climate_zones(id),
   station_code            TEXT,
   active                  INTEGER DEFAULT 1,  -- 1=active, 0=inactive/canceled (soft delete)
-  created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  confirmed_at            TIMESTAMP,
+  created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- immutable: original signup date
+  confirmed_at            TIMESTAMP,          -- set once on first email confirmation
+  subscribed_at           TIMESTAMP,          -- updated on every activation/reactivation
   unsubscribed_at         TIMESTAMP,
   cancelled_at            TIMESTAMP,          -- set when subscription is canceled
   stripe_customer_id      TEXT,
