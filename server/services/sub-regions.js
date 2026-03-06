@@ -718,4 +718,70 @@ const FLAVOR_TEXT = {
     'You garden in Hawaii — tropical year-round. Zone 10a–12 (varies by island and elevation). No frost, no cold season. Abundant rain on windward sides, dry on leeward. Ocean salt spray in exposed areas. Volcanic soil.',
 };
 
-module.exports = { getSubRegion, getSubRegionFlavor, STATION_MAP, BOUNDING_BOXES, FLAVOR_TEXT };
+// ── Concise sub-region descriptions — injected as sub_region_description ─────
+// Short, natural-language descriptions for characters to reference their location.
+// Keys include both canonical names and aliases matching getSubRegion() IDs.
+
+const SUB_REGION_FLAVOR = {
+  // Canonical keys from spec
+  colorado_front_range: "the Colorado Front Range, where gardens sit at 5,000-6,000 feet with intense sun, sudden hailstorms, and late frosts",
+  co_eastern_plains: "the Colorado Eastern Plains, a vast shortgrass prairie with dry winds and unpredictable springs",
+  wyoming_high_plains: "the Wyoming High Plains, where wind is constant and the growing season is short but intense",
+  willamette_valley: "Oregon's Willamette Valley, with mild wet winters and dry summers perfect for cool-season crops",
+  puget_sound: "the Puget Sound region, where maritime fog and year-round mild temps create a unique growing season",
+  or_coast: "the Oregon Coast, perpetually cool and misty with a gardening season unlike anywhere else",
+  norcal_central_valley: "California's Central Valley, with scorching summers and some of the most fertile farmland on earth",
+  socal_coastal: "coastal Southern California, where Mediterranean sun and ocean breezes make year-round gardening possible",
+  bay_area: "the San Francisco Bay Area, where microclimates shift block by block and fog is a gardening variable",
+  fl_panhandle: "the Florida Panhandle, humid and subtropical but with genuine winters unlike South Florida",
+  sc_lowcountry: "South Carolina's Lowcountry, coastal marshland with heat, humidity, and sandy soils",
+  la_statewide: "Louisiana, where the Gulf Coast humidity and rich deltaic soils define everything that grows",
+  me_coastal: "coastal Maine, where the short sharp growing season rewards patience and cold-hardy varieties",
+  ny_hudson_valley: "New York's Hudson Valley, a gardening region with deep agricultural history and distinct seasons",
+  new_england_inland: "inland New England, where late springs and early frosts bracket an intense summer of growth",
+  fl_keys: "the Florida Keys, a subtropical island chain where frost is unknown and saltwater shapes every garden",
+  hi_windward: "the windward slopes of Hawaii, lush and rainy with tropical abundance year-round",
+  hi_leeward: "the leeward side of Hawaii, drier and sunnier with a completely different palette of plants",
+  ak_anchorage: "the Anchorage bowl, where gardeners race the midnight sun and treasure every frost-free day",
+  ak_juneau: "Southeast Alaska, rainforest-adjacent with surprising growing power under long summer days",
+  ak_fairbanks: "Interior Alaska, where permafrost and 20-hour summer days create an extreme gardening challenge",
+
+  // Aliases matching getSubRegion() IDs
+  co_front_range: "the Colorado Front Range, where gardens sit at 5,000-6,000 feet with intense sun, sudden hailstorms, and late frosts",
+  co_true_plains: "the Colorado Eastern Plains, a vast shortgrass prairie with dry winds and unpredictable springs",
+  wy_statewide: "the Wyoming High Plains, where wind is constant and the growing season is short but intense",
+  or_willamette: "Oregon's Willamette Valley, with mild wet winters and dry summers perfect for cool-season crops",
+  wa_puget_sound: "the Puget Sound region, where maritime fog and year-round mild temps create a unique growing season",
+  ca_central_valley: "California's Central Valley, with scorching summers and some of the most fertile farmland on earth",
+  ca_socal_coastal: "coastal Southern California, where Mediterranean sun and ocean breezes make year-round gardening possible",
+  ca_bay_area: "the San Francisco Bay Area, where microclimates shift block by block and fog is a gardening variable",
+  la_new_orleans: "Louisiana, where the Gulf Coast humidity and rich deltaic soils define everything that grows",
+  la_central: "Louisiana, where the Gulf Coast humidity and rich deltaic soils define everything that grows",
+  me_statewide: "coastal Maine, where the short sharp growing season rewards patience and cold-hardy varieties",
+  ny_hudson: "New York's Hudson Valley, a gardening region with deep agricultural history and distinct seasons",
+  fl_southern: "the Florida Keys, a subtropical island chain where frost is unknown and saltwater shapes every garden",
+  hi_statewide: "the windward slopes of Hawaii, lush and rainy with tropical abundance year-round",
+  ak_statewide: "the Anchorage bowl, where gardeners race the midnight sun and treasure every frost-free day",
+  vt_statewide: "inland New England, where late springs and early frosts bracket an intense summer of growth",
+  nh_statewide: "inland New England, where late springs and early frosts bracket an intense summer of growth",
+  ma_western: "inland New England, where late springs and early frosts bracket an intense summer of growth",
+};
+
+/**
+ * Get concise sub-region description for prompt injection.
+ * Falls back to formatted zone name if sub-region not in map.
+ * @param {string|null} subRegionId - from getSubRegion()
+ * @param {string} [zoneFallback] - climate_zone_id to format as fallback
+ * @returns {string}
+ */
+function getSubRegionDescription(subRegionId, zoneFallback) {
+  if (subRegionId && SUB_REGION_FLAVOR[subRegionId]) {
+    return SUB_REGION_FLAVOR[subRegionId];
+  }
+  // Fallback: format zone name → "high_plains" → "the High Plains"
+  const zone = zoneFallback || subRegionId || 'high_plains';
+  const formatted = zone.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return `the ${formatted}`;
+}
+
+module.exports = { getSubRegion, getSubRegionFlavor, getSubRegionDescription, SUB_REGION_FLAVOR, STATION_MAP, BOUNDING_BOXES, FLAVOR_TEXT };

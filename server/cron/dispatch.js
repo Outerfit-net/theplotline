@@ -14,7 +14,7 @@ const fs = require('fs');
 const { sendDailyEmail } = require('../services/email');
 const { getSeasonName } = require('../services/seasonNames');
 const { detectWeatherType } = require('../services/weather');
-const { getSubRegion, getSubRegionFlavor } = require('../services/sub-regions');
+const { getSubRegion, getSubRegionFlavor, getSubRegionDescription } = require('../services/sub-regions');
 // encKey is loaded lazily inside runDispatch so it's available after dotenv loads
 
 const MASTHEAD_DIR = path.join(__dirname, '..', '..', 'data', 'mastheads');
@@ -52,22 +52,99 @@ const SOLAR_TERMS_JS = [
   { month: 1,  day: 20, name: 'Major Cold'           },
 ];
 
-function getCurrentSolarTerm(date = new Date()) {
+// ── Zone offsets (days) for solar term adjustment ────────────────────────────
+// Positive = later/colder, negative = earlier/warmer relative to high_plains baseline.
+const ZONE_OFFSETS = {
+  high_plains:               { spring: 0,   summer: 0,  fall: 0,  winter: 0 },
+  pacific_maritime:          { spring: -7,  summer: 7,  fall: 0,  winter: 5 },
+  california_med:            { spring: -14, summer: 7,  fall: -5, winter: 10 },
+  desert_southwest:          { spring: -21, summer: 14, fall: -7, winter: 14 },
+  great_plains:              { spring: 0,   summer: 0,  fall: 3,  winter: 3 },
+  great_lakes:               { spring: 7,   summer: 0,  fall: 7,  winter: 7 },
+  upper_midwest_continental: { spring: 7,   summer: -3, fall: 10, winter: 10 },
+  appalachian:               { spring: 7,   summer: 3,  fall: 5,  winter: 7 },
+  humid_subtropical:         { spring: -14, summer: -6, fall: -8, winter: 16 },
+  northeast:                 { spring: 7,   summer: 0,  fall: 7,  winter: 7 },
+  florida_southern:          { spring: -21, summer: 0,  fall: -10, winter: 14 },
+  florida_keys_tropical:     { spring: -30, summer: 0,  fall: -10, winter: 10 },
+  hawaii:                    { spring: -30, summer: 5,  fall: -10, winter: 0 },
+  southern_plains:           { spring: -7,  summer: 7,  fall: -3, winter: 10 },
+  alaska_interior:           { spring: 21,  summer: -10, fall: 21, winter: 28 },
+  alaska_south_coastal:      { spring: 14,  summer: -5, fall: 14, winter: 18 },
+  uk_maritime:               { spring: 0,   summer: 7,  fall: 0,  winter: 5 },
+  mediterranean_eu:          { spring: -14, summer: 7,  fall: -7, winter: 10 },
+  central_europe:            { spring: 7,   summer: 0,  fall: 7,  winter: 7 },
+  canada_prairie:            { spring: 14,  summer: -5, fall: 14, winter: 21 },
+  canada_maritime:           { spring: 7,   summer: 0,  fall: 7,  winter: 10 },
+  japan_temperate:           { spring: -7,  summer: -5, fall: 0,  winter: 5 },
+  iceland_subarctic:         { spring: 21,  summer: -10, fall: 21, winter: 28 },
+  australia_tropical:        { spring: -30, summer: 0,  fall: -10, winter: 0 },
+  australia_temperate:       { spring: -14, summer: 3,  fall: -7, winter: 7 },
+  south_africa_temperate:    { spring: -14, summer: 3,  fall: -7, winter: 7 },
+  south_africa_subtropical:  { spring: -14, summer: -3, fall: -8, winter: 10 },
+  brazil_subtropical:        { spring: -14, summer: 0,  fall: -8, winter: 7 },
+};
+
+// Tropical zones use seasonal names instead of 24 solar terms
+const TROPICAL_SEASONS = {
+  hawaii: (month) => (month >= 5 && month <= 10) ? "Dry Season (Kau)" : "Wet Season (Ho'oilo)",
+  florida_keys_tropical: (month) => (month >= 6 && month <= 11) ? 'Hurricane Season' : 'Dry Season',
+  australia_tropical: (month) => (month >= 11 || month <= 3) ? 'Wet Season' : 'Dry Season',
+};
+
+/**
+ * Get the meteorological season for a given month.
+ * spring=Mar-May, summer=Jun-Aug, fall=Sep-Nov, winter=Dec-Feb
+ */
+function _getSeasonForMonth(month) {
+  if (month >= 3 && month <= 5) return 'spring';
+  if (month >= 6 && month <= 8) return 'summer';
+  if (month >= 9 && month <= 11) return 'fall';
+  return 'winter';
+}
+
+/**
+ * Get the day-of-year for a Date (1-indexed).
+ */
+function _dayOfYear(date) {
+  const start = new Date(date.getFullYear(), 0, 0);
+  const diff = date - start;
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+
+function getCurrentSolarTerm(date = new Date(), zone = 'high_plains') {
   const m = date.getMonth() + 1; // 1-indexed
-  const d = date.getDate();
+
+  // Tropical zones: return seasonal name instead of solar term
+  if (TROPICAL_SEASONS[zone]) {
+    return TROPICAL_SEASONS[zone](m);
+  }
+
+  // Apply zone offset: shift the effective date by the zone's seasonal offset
+  const offsets = ZONE_OFFSETS[zone] || ZONE_OFFSETS.high_plains;
+  const season = _getSeasonForMonth(m);
+  const offsetDays = offsets[season] || 0;
+
+  // Create an adjusted date by subtracting the offset
+  const adjusted = new Date(date);
+  adjusted.setDate(adjusted.getDate() - offsetDays);
+
+  const am = adjusted.getMonth() + 1;
+  const ad = adjusted.getDate();
+
   // Walk backwards through terms to find the most recent one
   // Build a flat list sorted by (month, day), handling Jan wrap
   const sorted = [...SOLAR_TERMS_JS].sort((a, b) => {
-    const am = a.month === 1 ? 13 : a.month;
+    const am2 = a.month === 1 ? 13 : a.month;
     const bm = b.month === 1 ? 13 : b.month;
-    if (am !== bm) return am - bm;
+    if (am2 !== bm) return am2 - bm;
     return a.day - b.day;
   });
-  const cm = m === 1 ? 13 : m;
+  const cm = am === 1 ? 13 : am;
   let current = sorted[sorted.length - 1]; // default: last of year
   for (const term of sorted) {
     const tm = term.month === 1 ? 13 : term.month;
-    if (tm < cm || (tm === cm && term.day <= d)) {
+    if (tm < cm || (tm === cm && term.day <= ad)) {
       current = term;
     }
   }
@@ -83,7 +160,7 @@ async function getMasthead(combo, dailyRun) {
   const author = combo.author_key || 'hemingway';
   const season = (dailyRun.season || 'spring').toLowerCase();
   const weatherType = detectWeatherType(dailyRun.weather_summary || '');
-  const solarTerm = getCurrentSolarTerm();
+  const solarTerm = getCurrentSolarTerm(new Date(), combo.climate_zone_id || 'high_plains');
   // Title is pre-generated by getNewsletterTitle(); pass it to the art renderer
   const title = dailyRun.newsletter_title || null;
 
@@ -248,6 +325,10 @@ function runEngine(combo) {
       '--sub-region', (() => {
         const id = getSubRegion(combo.station_code, combo.lat, combo.lon);
         return id ? (getSubRegionFlavor(id) || '') : '';
+      })(),
+      '--sub-region-description', (() => {
+        const id = getSubRegion(combo.station_code, combo.lat, combo.lon);
+        return getSubRegionDescription(id, combo.climate_zone_id);
       })(),
       '--output', 'json'
     ];
@@ -427,7 +508,7 @@ async function runDispatch(db) {
         // Generate newsletter title (folksy, phi4-driven)
         const season      = (dailyRun.season || 'spring').toLowerCase();
         const weatherType = detectWeatherType(dailyRun.weather_summary || '');
-        const solarTerm   = getCurrentSolarTerm();
+        const solarTerm   = getCurrentSolarTerm(new Date(), combo.climate_zone_id || 'high_plains');
         const region      = combo.climate_zone_slug || null;
         dailyRun.newsletter_title = await getNewsletterTitle(solarTerm, season, weatherType, region);
 

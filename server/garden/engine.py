@@ -172,7 +172,7 @@ def generate_quote():
     return f"{quote} -- {author}"
 
 
-def generate_dialogue(characters, topic, quote, weather, garden_context, city, state, sub_region=''):
+def generate_dialogue(characters, topic, quote, weather, garden_context, city, state, sub_region='', sub_region_description=''):
     """Generate a dialogue between characters about the topic"""
 
     # Character voice snippets (simplified for subprocess use)
@@ -228,7 +228,7 @@ def generate_dialogue(characters, topic, quote, weather, garden_context, city, s
     return dialogue
 
 
-def refine_to_prose(dialogue, author_key, sub_region=''):
+def refine_to_prose(dialogue, author_key, sub_region='', sub_region_description=''):
     """Convert dialogue list to prose narrative"""
     author_style = AUTHOR_STYLES.get(author_key, AUTHOR_STYLES['hemingway'])
 
@@ -265,6 +265,7 @@ def main():
     parser.add_argument('--lon', type=float, required=True, help='Longitude')
     parser.add_argument('--context', default='', help='Garden context for location')
     parser.add_argument('--sub-region', default='', dest='sub_region', help='Sub-region flavor text for local specificity')
+    parser.add_argument('--sub-region-description', default='', dest='sub_region_description', help='Concise sub-region description for character dialogue')
     parser.add_argument('--output', choices=['json', 'text'], default='json', help='Output format')
     parser.add_argument('--num-chars', type=int, default=4, help='Number of characters')
     args = parser.parse_args()
@@ -295,11 +296,13 @@ def main():
     dialogue = generate_dialogue(
         chosen, topic, quote, weather,
         args.context, args.city, args.state,
-        sub_region=args.sub_region
+        sub_region=args.sub_region,
+        sub_region_description=args.sub_region_description
     )
 
     # Refine to prose
-    prose = refine_to_prose(dialogue, args.author, sub_region=args.sub_region)
+    prose = refine_to_prose(dialogue, args.author, sub_region=args.sub_region,
+                            sub_region_description=args.sub_region_description)
 
     # Build result
     result = {
@@ -311,6 +314,7 @@ def main():
         "characters": character_names,
         "weather_summary": weather["current"],
         "sub_region": args.sub_region or None,
+        "sub_region_description": args.sub_region_description or None,
         "prose_text": prose,
         "prose_html": prose.replace("\n\n", "</p><p>").replace("\n", "<br>"),
         "generated_at": datetime.now().isoformat(),
