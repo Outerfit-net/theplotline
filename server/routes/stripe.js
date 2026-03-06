@@ -504,32 +504,39 @@ If you're not interested, you can ignore this email.
             );
 
             // ── Backfill zipcode + re-geocode from Stripe billing address if not provided ──
-            const postalCode = session.customer_details?.address?.postal_code;
-            if (postalCode) {
-              const existing = await db.prepare('SELECT pgp_sym_decrypt(zipcode_enc, ?)::text AS zipcode, lat, lon FROM subscribers WHERE id = ?').get(encKey, subscriberId);
+            const sessionPostalCode = session.customer_details?.address?.postal_code;
+            if (sessionPostalCode) {
+              const existing = await db.prepare(
+                `SELECT pgp_sym_decrypt(zipcode_enc, $1)::text AS zipcode, lat, lon FROM subscribers WHERE id = $2`
+              ).get(encKey, subscriberId);
               const needsZip = !existing?.zipcode;
               const needsGeo = !existing?.lat;
 
-              if (needsZip || needsGeo) {
-                await db.prepare(`
-                  UPDATE subscribers SET zipcode_enc = pgp_sym_encrypt(COALESCE(NULLIF(pgp_sym_decrypt(zipcode_enc, ?)::text,''), ?), ?) WHERE id = ?
-                `).run(encKey, postalCode, encKey, subscriberId);
+              // Backfill zip from Stripe only if subscriber didn't provide one
+              if (needsZip) {
+                await db.prepare(
+                  `UPDATE subscribers SET zipcode_enc = pgp_sym_encrypt($1, $2) WHERE id = $3`
+                ).run(sessionPostalCode, encKey, subscriberId);
+                fastify.log.info(`[webhook] backfilled zip ${sessionPostalCode} for ${subscriberId}`);
+              }
 
-                // Re-geocode using zipcode for precision
+              // Geocode if coordinates are missing — use subscriber's zip if they have one, else session zip
+              if (needsGeo) {
+                const zipForGeo = existing?.zipcode || sessionPostalCode;
                 try {
-                  const geo = await geocode(postalCode, 'US');
+                  const geo = await geocode(zipForGeo, 'US');
                   if (geo) {
                     const zoneId = assignClimateZone(geo.lat, geo.lon, 'US');
-                    await db.prepare(`
-                      UPDATE subscribers SET lat = ?, lon = ?,
-                        lat_enc = pgp_sym_encrypt(?::text, ?),
-                        lon_enc = pgp_sym_encrypt(?::text, ?),
-                        climate_zone_id = ? WHERE id = ?
-                    `).run(geo.lat, geo.lon, String(geo.lat), encKey, String(geo.lon), encKey, zoneId, subscriberId);
-                    fastify.log.info(`[webhook] geocoded zip ${postalCode} → ${geo.lat},${geo.lon} zone=${zoneId} for ${subscriberId}`);
+                    await db.prepare(
+                      `UPDATE subscribers SET lat = $1, lon = $2,
+                        lat_enc = pgp_sym_encrypt($3::text, $4),
+                        lon_enc = pgp_sym_encrypt($5::text, $6),
+                        climate_zone_id = $7 WHERE id = $8`
+                    ).run(geo.lat, geo.lon, String(geo.lat), encKey, String(geo.lon), encKey, zoneId, subscriberId);
+                    fastify.log.info(`[webhook] geocoded zip ${zipForGeo} → ${geo.lat},${geo.lon} zone=${zoneId} for ${subscriberId}`);
                   }
                 } catch (geoErr) {
-                  fastify.log.warn(`[webhook] geocode failed for zip ${postalCode}:`, geoErr.message);
+                  fastify.log.warn(`[webhook] geocode failed for zip ${zipForGeo}:`, geoErr.message);
                 }
               }
             }
