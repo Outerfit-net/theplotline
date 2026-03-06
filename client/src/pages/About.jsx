@@ -34,10 +34,17 @@ export default function About() {
 
         <h2 className="text-xl text-[var(--color-green-dark)] mb-4">Privacy</h2>
         <p>
-          We believe privacy isn't a feature — it's the baseline. Your email is used only for 
-          delivering your daily garden letter and account communications. We never share, sell, 
-          or rent your personal information to anyone. Payment processing is handled entirely 
-          by Stripe; we never see or store your credit card details.
+          We believe privacy isn't a feature — it's the baseline. Your email address is
+          encrypted at rest in our database using AES-256 encryption and is never stored
+          in plaintext. It is used only to deliver your daily garden letter and for
+          essential account communications. We never share, sell, or rent your personal
+          information to anyone, ever.
+        </p>
+        <p>
+          Your location (city and state) is used solely to personalize your garden content
+          for your climate zone. It is also encrypted at rest. Payment processing is handled
+          entirely by Stripe — we never see or store your credit card details. Backups of
+          our database are encrypted with GPG before leaving our servers.
         </p>
         <p>
           The Plot Line started the way most things do — with a problem that wouldn't let go.
