@@ -1,5 +1,5 @@
 # Plot Lines — TODO
-*Last Updated: 2026-03-07*
+*Last Updated: 2026-03-06*
 *Keep this in sync with THE-GARDEN-architecture.md. When a TODO is done, mark it ✅ and note the commit.*
 
 ---
@@ -62,18 +62,18 @@
 **Action:** Spawn model in a loop, one zone+term at a time, collect results, store in `topics` DB table
 **Status:** ⬜ LATER
 
-### P2. Quote Module — `garden-quotes.py` (doesn't exist)
+### P2. Quote Module — `garden-quotes.py`
 **Spec:** 24 solar terms × 14 quotes = 336 quotes
-**Interface:** `get_quote(season_bucket, run_date)` → `{text, attribution}`
-**Storage:** `quotes` table `(id, text, attribution, season_bucket)`
-**Non-repeat:** `quote_usage` table `(quote_id, run_date)` — cycle all 14 before repeating
-**Status:** ⬜ TODO
+**Interface:** `get_quote(term_name, run_date, station_code)` → `{text, attribution}`
+**Storage:** `quote_usage` table for non-repeat tracking
+**Status:** ✅ DONE — `garden_quotes.py` exists with 336 quotes, wired into `garden-dialogue.py` via `from garden_quotes import get_quote`; QUOTE_BANK removed from dialogue; `quote_usage` table in Postgres
 
-### P3. Title Dict — `title_dict.py` (doesn't exist)
-**Spec:** Pre-generate titles per `(season_bucket, climate_zone_id, condition)` = 24×28×6 = 4,032 titles
-**Issue:** Currently generated per-run via mistral with 30s timeout — slow and inconsistent
+### P3. Title Dict — `title_dict.py`
+**Spec:** Pre-generate titles per `(season_bucket, climate_zone_id, condition)` = up to 4,032 titles
+**Issue:** Was generated per-run via mistral with 30s timeout — slow and inconsistent
 **Storage:** `title_dict` DB table, look up at dispatch time
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — `title_dict.py` exists, wired into `garden-dispatch.py` via `from title_dict import get_title`; `title_dict` table in Postgres (18 rows seeded so far — not fully populated)
+**Note:** Table only has 18 rows — not all combos pre-generated yet. Falls back to generate_title.py when no match. Full population is future work (P1b-style sweep).
 
 ### P4. DB tables for P1/P2/P3
 **Tables needed:**
@@ -81,15 +81,14 @@
 - `quotes (id, text, attribution, season_bucket)`
 - `quote_usage (quote_id, run_date)`
 - `title_dict (id, title, season_bucket, climate_zone_id, condition)`
-**Status:** ⬜ TODO
+**Status:** ✅ PARTIAL — `quote_usage` ✅, `title_dict` ✅ (18 rows). `topics` table and `quotes` table not yet in DB — quotes live in QUOTE_BANK_336 dict in garden_quotes.py (in-memory, not DB).
 
 ---
 
 ## 🟡 DIALOGUE — Code Review & Sync
 
 ### D1. Full dialogue code review
-**Status:** ✅ DONE — `--zone` + `--hemisphere` now passed from dispatch; solar term correct per subscriber; commits `e6dac06`
-**Remaining sub-item:** Quote still from hardcoded QUOTE_BANK — blocked on P2 (garden-quotes.py)
+**Status:** ✅ DONE — `--zone` + `--hemisphere` now passed from dispatch; solar term correct per subscriber; commits `e6dac06`; QUOTE_BANK removed, now uses `garden_quotes.get_quote()`
 
 ### D2. Character memory — filter to participated conversations
 **Status:** ✅ DONE — commit `967ad56` — reads `**Characters:**` line, only includes conversations char appeared in
