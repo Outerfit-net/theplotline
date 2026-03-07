@@ -669,36 +669,40 @@ flowchart TD
     QUERY -->|"subscribers[]"| DELIVERY
 
     WEATHER["garden-weather.py\n(station_code, zipcode, lat, lon)\n→ {condition, forecast}"]
-    SOLAR["garden_seasons.py\n(climate_zone_id, hemisphere)\n→ {season_bucket, season_bucket_description}"]
+    SOLAR["get_garden_moment()\ngarden_seasons.py\n(climate_zone_id, hemisphere)\n→ {season_bucket, description}\nchanges every ~14 days"]
 
     WEATHER -->|condition| ART
     WEATHER -->|condition| TITLEDICT
-    WEATHER -->|forecast| DIALOGUE
+    WEATHER -->|forecast| GARDENCTX
     SOLAR -->|season_bucket, description| ART
-    SOLAR -->|season_bucket, description| DIALOGUE
+    SOLAR -->|season_bucket, description| GARDENCTX
     SOLAR -->|season_bucket, climate_zone_id| TOPIC
     SOLAR -->|season_bucket| QUOTE
-    SOLAR -->|season_bucket, climate_zone_id| TITLEDICT
+    SOLAR -->|season_bucket, climate_zone_id, description| TITLEDICT
 
     SUBR["sub-regions.js\n(station_code, climate_zone_id)\n→ {sub_region_description}"]
-    TOPIC["topic_bank_24.py ⚠️TODO\n(season_bucket, climate_zone_id)\n→ {topic}"]
-    QUOTE["garden-quotes.py ⚠️TODO\n(season_bucket)\n→ {quote}"]
+    TOPIC["topic_bank_24.py\n(season_bucket, climate_zone_id)\n→ {topic}"]
+    QUOTE["garden-quotes.py\n(season_bucket)\n→ {quote}"]
     AUTH["authors.json\n(author_key)\n→ {author_voice}"]
     CHARS["persona-*.md\n(character_key)\n→ {character_souls}"]
-    ARCHIVE[("archive/station/author/\nYYYY-MM-DD.md\nlast 7 days")]
-    TITLEDICT["title_dict.py ⚠️TODO\n(season_bucket, climate_zone_id, condition)\n→ {title}"]
+    PROSE_CACHE[("prose cache\ndate, climate_zone_id\nsub_region, author_key\nlast 7 days")]
+    TITLEDICT["title_dict\n(season_bucket, climate_zone_id, condition)\nDB cache — self-populates\nevery ~14 days per zone\n→ {title}"]
     ART["generate_art.py\n(condition, season_bucket\nseason_bucket_description)\nSDXL, 30 steps\n→ {png_path}"]
 
-    SUBR --> DIALOGUE
-    TOPIC --> DIALOGUE
-    QUOTE --> DIALOGUE
-    AUTH --> DIALOGUE
-    CHARS --> DIALOGUE
-    ARCHIVE -->|last 7 days| DIALOGUE
+    SUBR -->|sub_region_description| GARDENCTX
+    TOPIC -->|topic| GARDENCTX
+    QUOTE -->|quote| GARDENCTX
+    CHARS -->|character_souls| GARDENCTX
+    PROSE_CACHE -->|past prose| GARDENCTX
 
-    DIALOGUE["garden-dialogue.py\n(author_key)\n3-5 chars, 6-10 turns\n800 char hard limit\n→ {prose}"]
+    GARDENCTX["garden context cache\n(climate_zone_id, sub_region\nseason_bucket, condition)\nJSON cache — self-populates\nevery ~14 days per zone\n→ {garden_context}"]
 
-    DIALOGUE --> ARCHIVE
+    GARDENCTX -->|garden_context| DIALOGUE
+    AUTH -->|author_voice| DIALOGUE
+
+    DIALOGUE["garden-dialogue.py\n(date, climate_zone_id, sub_region, author_key)\n3-5 chars, 6-10 turns\n800 char hard limit\n→ {prose}"]
+
+    DIALOGUE -->|prose| PROSE_CACHE
     ART -->|png_path| MASTHEAD
     TITLEDICT -->|title| MASTHEAD
 
@@ -711,9 +715,11 @@ flowchart TD
     ASSEMBLY["garden-assembler.py\n(url, prose, quote, unsubscribe_token)\n→ {html}"]
 
     ASSEMBLY -->|html| DELIVERY
-    QUOTE -->|quote| DELIVERY
-
     DELIVERY["garden-mailer.py\nper email_address\n→ email sent"]
+
+    %% Self-populating caches — miss triggers generate+store
+    TITLEDICT -.->|"miss: generate via phi4\nstore for next run"| TITLEDICT
+    GARDENCTX -.->|"miss: generate via sonnet\nstore for next run"| GARDENCTX
 ```
 
 ---
