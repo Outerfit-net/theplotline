@@ -123,4 +123,5 @@ cd /opt/plotlines && git add docs/TODO.md && git commit -m "todo: XX — short d
 
 ## Reference
 
-See `references/pipeline.md` for DAG grain, file paths, flag reference, active combos, and known issues.
+- `references/pipeline.md` — DAG grain, file paths, flag reference, active combos, known issues
+- `references/interfaces.md` — Full input/output contract for every module. Use this to verify each stage. Any null where not-null is expected = broken interface = stop and fix.
