@@ -7,27 +7,16 @@
 ## 🔴 CRITICAL — App Correctness
 
 ### C1. Master Query — add climate_zone_id, hemisphere, lat, lon
-**File:** `skills/garden-conversation/garden-dispatch.py: _load_combinations()`
-**Issue:** Master query GROUP BY is missing `climate_zone_id`, `hemisphere`, `lat`, `lon`. These are needed for Solar Term, Art, Topic, Title Dict, and Weather (lat/lon for NWS gridpoint).
-**Expected:** GROUP BY `(station_code, zipcode, author_key, climate_zone_id, hemisphere, lat, lon)` with `JSON_AGG(subscribers)`
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit `b4d45f5`
 
 ### C2. Master Query — collapse to single GROUP BY query with JSON_AGG
-**File:** `skills/garden-conversation/garden-dispatch.py`
-**Issue:** Currently two separate queries (`_load_combinations` + `_load_subscribers`). Should be one query grouped by `(station_code, zipcode, author_key, climate_zone_id, hemisphere, lat, lon)` with `JSON_AGG({email, unsubscribe_token})`.
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit `b4d45f5` — `_load_combos()` replaces `_load_combinations()` + `_load_subscribers()`
 
 ### C3. Solar Term — hemisphere not used
-**File:** `skills/garden-conversation/garden_seasons.py: get_current_solar_term()`
-**Issue:** Southern hemisphere subscribers get wrong solar terms — seasons are not flipped. `hemisphere` parameter missing from function signature.
-**Fix:** Accept `hemisphere` param, flip season bucket if `S` (spring↔fall, summer↔winter)
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit `c94a3a7` — `get_current_solar_term(date, zone, hemisphere)` flips spring↔fall, summer↔winter for S hemisphere
 
-### C4. SUBJECTS_BY_ZONE_SEASON — only 6 of 28 zones covered
-**File:** `skills/garden-conversation/generate_art.py`
-**Issue:** 22 of 28 zones fall through to `high_plains` default subjects. Key West, Juneau, Seattle all get wrong art subjects.
-**Fix:** Add subjects for all 28 zones × 4 seasons
-**Status:** ⬜ TODO
+### C4. SUBJECTS_BY_ZONE_SEASON — all 28 zones
+**Status:** ✅ DONE — commit `6d8f199` — 112 entries (28 zones × 4 seasons), old key names migrated
 
 ### C5. Node.js server routes still use `?` placeholder shim
 **File:** `server/routes/subscribers.js`, `server/routes/stripe.js`, all routes
@@ -35,26 +24,17 @@
 **Status:** ⬜ TODO
 
 ### C6. `fallback-prose.py` — purpose unknown
-**File:** `skills/garden-conversation/fallback-prose.py`
-**Issue:** Not documented, unclear if still used. Verify and either document or delete.
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit `b7696ae` — confirmed dead, deleted
 
 ### C7. Dead scripts — delete or archive
-**Files:** `garden-daily-v2.py`, `garden-daily-v3.py`, `garden-daily-single-email.py`
-**Issue:** Old monolithic scripts superseded by dispatch. Cluttering the repo.
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit `b7696ae` — deleted garden-daily-v2/v3, garden-daily-single-email, fallback-prose
 
 ---
 
 ## 🟡 CONTENT — Missing Pipeline Components
 
-### P1a. Topic Bank — generate for CURRENT active zone+season combos only (do now)
-**File:** `skills/garden-conversation/topic_bank_24.py`
-**Scope:** Only the zones + season_buckets that active subscribers actually have right now
-**Current active:** BOU→high_plains/spring, AJK→alaska_south_coastal/spring, KEY→florida_keys_tropical/wet_season
-**Spec:** 3 combos × 14 topics = 42 topics to start
-**Non-repeat:** Round-robin tracked in `topic_usage` DB table `(topic_id, station_code, run_date)`
-**Status:** ⬜ TODO
+### P1a. Topic Bank — current active zone+season combos
+**Status:** ✅ DONE — agent generated 42 topics (14 per combo), `get_topic(term, bucket, zone)` function with fallback chain added to `topic_bank_24.py`; dialogue now calls `get_topic()`
 
 ### P1b. Topic Bank — full expansion to all 28 zones × 24 terms (do later)
 **Spec:** 24 terms × 28 zones × 14 topics = 9,408 topics
@@ -87,35 +67,17 @@
 ## 🟡 DIALOGUE — Code Review & Sync
 
 ### D1. Full dialogue code review
-**File:** `skills/garden-conversation/garden-dialogue.py`
-**Tasks:**
-- Verify `get_current_solar_term()` is called with `(date, climate_zone_id, hemisphere)` not just date
-- Verify topic is loaded from `(season_bucket, climate_zone_id)` not just random
-- Verify quote is loaded from module not hardcoded bank
-- Verify `garden_context` (sub-region description) is passed correctly
-- Verify `char_memory` is filtered to conversations that character participated in (not all characters getting full archive)
-- Verify 800 char limit is enforced and logged when hit
-- Verify archive is written to `skills/garden-conversation/archive/` (SKILLS_DIR) not workspace/memory
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — `--zone` + `--hemisphere` now passed from dispatch; solar term correct per subscriber; commits `e6dac06`
+**Remaining sub-item:** Quote still from hardcoded QUOTE_BANK — blocked on P2 (garden-quotes.py)
 
 ### D2. Character memory — filter to participated conversations
-**File:** `skills/garden-conversation/garden-dialogue.py: read_character_memory()`
-**Issue:** Every character gets full archive of all conversations. Should only see conversations they participated in (check `**Characters:**` line in archive).
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit `967ad56` — reads `**Characters:**` line, only includes conversations char appeared in
 
 ### D3. Dialogue archive → Postgres
-**Issue:** Archive lives in flat files (`archive/station/author/YYYY-MM-DD.md`). Should be stored in `daily_runs` table (already exists) for backup, queryability, and rebuild survival.
-**Keep:** Flat files as working cache — but write to DB as source of truth
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit `b17bdd3` — upserts to `daily_runs` on each non-dry-run dispatch; combination_id now in master query
 
 ### D4. `garden_seasons.py` — full review
-**Issue:** matte_d_scry flagged dissatisfaction. Review:
-- Are all 28 zones in `ZONE_OFFSETS`?
-- Are southern hemisphere zones correctly offset?
-- Is `get_current_solar_term()` callable with `(date, climate_zone_id, hemisphere)`?
-- Is `season_bucket_description` the full description text or just the name?
-- Are tropical zones (hawaii, florida_keys_tropical, australia_tropical) returning Wet/Dry seasons correctly?
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — all 28 zones in ZONE_OFFSETS; `get_current_solar_term(date, zone, hemisphere)` with S-flip; tropical zones return wet_season/dry_season; commits `c94a3a7` + `187ef83`
 
 ---
 
@@ -171,17 +133,7 @@ Tests we need that don't exist:
 **Status:** ⬜ TODO
 
 ### T4. Pre-flight checks — build into dispatch
-**File:** `skills/garden-conversation/garden-dispatch.py`
-**Spec:** Before sending any email, verify:
-1. Postgres reachable, combinations exist
-2. All active subscribers have valid decrypted emails
-3. No stale zone names in DB (`alaska`, `humid_southeast`, `upper_midwest`)
-4. Ollama up, required models loaded
-5. NWS reachable (or Open-Meteo fallback available)
-6. Resend API key valid
-**On failure:** Hard stop + Telegram alert to 8233843319. No emails sent.
-**Post-run:** Log "DISPATCH OK: N sent, 0 failed" or alert with specifics.
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit `9b780df` — `_preflight()` checks DB, stale zones, Ollama, SMTP, NWS; hard-stops with Telegram alert on any error
 
 ---
 
