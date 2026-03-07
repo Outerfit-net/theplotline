@@ -545,3 +545,21 @@ One row per object. Every input and output explicit. Every group by defined.
 | `DB: subscribers` | All subscriber data (encrypted) | `(email_address)` |
 | `DB: daily_runs` | Per-run output record | `(combination_id, run_date)` |
 | `DB: deliveries` | Per-subscriber send record | `(subscriber_id, daily_run_id)` |
+
+---
+
+## Dialogue Breakdown
+
+| Step | What Happens | Inputs | Notes |
+|------|-------------|--------|-------|
+| Character selection | Pick 3–5 randomly from 12 | `(author_key, --num-chars)` | `random.sample(CAST, 3-5)`, then shuffled |
+| Session bootstrap | Spawn one OpenClaw session per character | `(character_key, model)` | One persistent session per run |
+| Character bootstrap | Each character gets first prompt, says hello | `{name, date, season_context, topic, quote, weather_report, garden_context, char_memory, convo_so_far}` | One turn each in order |
+| Dialogue loop | Characters take turns, weighted random speaker | Last 6 turns of `{hist}` + `{char_memory, other_personas, weather_report, garden_context, topic, quote}` | 6–10 turns, max `total_turns × 3` attempts |
+| Speaker weighting | Previous speaker gets 0.1 weight, others 1.0 | `(last_speaker_idx)` | Prevents monologue |
+| Other personas | Every non-speaking character's full persona injected | `persona-*.md` for all others | So each knows who they're talking to |
+| Character memory | Last 7 days full archive per character | `archive/<station>/<author>/` | Injected every turn |
+| Retry logic | 2 retries per turn if output fails parse | `(output, dt, SLOW_CALL_S=30s)` | Falls back if slow or fallbackish |
+| Author voice — haiku pass | Haiku drafts prose from raw dialogue | `{hist, author_style}` | 120s timeout |
+| Author voice — sonnet pass | Sonnet refines to final prose | `{haiku_draft, author_style}` | **800 char hard limit** |
+| Archive write | Full conversation saved to `.md` | `(topic, quote, weather, prose, participants)` | `archive/<station>/<author>/YYYY-MM-DD.md` |
