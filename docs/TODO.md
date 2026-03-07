@@ -81,7 +81,7 @@
 - `title_dict (id, title, season_bucket, climate_zone_id, condition)` — cached titles
 - `topics (id, text, season_bucket, climate_zone_id, used_date)` — for topic non-repeat tracking
 **Note:** `quotes` table not needed — 336 quotes live in-memory in `garden_quotes.py`; `quote_usage` handles non-repeat correctly (14-day window per station). Topics have NO non-repeat tracking at all — same topic can repeat daily.
-**Status:** ✅ PARTIAL — `quote_usage` ✅ (non-repeat working), `title_dict` ✅ (18 rows seeded). `topics` table ❌ missing — topic repeat tracking not implemented.
+**Status:** ✅ DONE — `quote_usage` ✅ (14-day non-repeat per station), `title_dict` ✅ (18 rows seeded, grows over time), `topic_usage` ✅ (14-day non-repeat per station, table created, wired into `get_topic()` + `garden-dialogue.py`). `quotes` table not needed — quotes are in-memory dict, `quote_usage` handles state.
 
 ---
 
