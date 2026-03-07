@@ -520,7 +520,7 @@ One row per object. Every input and output explicit. Every group by defined.
 
 | Stage | Group By | Inputs | Output |
 |-------|----------|--------|--------|
-| Climate Zone | `(lat, lon, country)` | signup form | `{climate zone, hemisphere}` → stored on subscriber, drives all downstream lookups |
+| Climate Zone | `(lat, lon, country)` | signup form | `{climate_zone_id, hemisphere}` → stored on subscriber, drives all downstream lookups |
 | Weather | `(station_code, zipcode)` | NWS + Open-Meteo APIs | `{condition, forecast}` → Art, Title Dict, Garden Context |
 | Solar Term | `(climate_zone_id, hemisphere)` | `garden_seasons.py` | `{season_bucket, season_bucket_description}` → Art, Topic, Garden Context |
 | Sub-region | `(station_code, climate_zone_id)` | `sub-regions.js` | `{sub_region_description}` → Garden Context |
