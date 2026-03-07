@@ -520,7 +520,7 @@ One row per object. Every input and output explicit. Every group by defined.
 
 | Stage | Group By | Inputs | Output |
 |-------|----------|--------|--------|
-| Zone Assignment | `(lat, lon, country)` | signup form | `{climate_zone_id, hemisphere}` → stored on subscriber, drives all downstream lookups |
+| Climate Zone | `(lat, lon, country)` | signup form | `{climate zone, hemisphere}` → stored on subscriber, drives all downstream lookups |
 | Weather | `(station_code, zipcode)` | NWS + Open-Meteo APIs | `{condition, forecast}` → Art, Title Dict, Garden Context |
 | Solar Term | `(climate_zone_id, hemisphere)` | `garden_seasons.py` | `{season_bucket, season_bucket_description}` → Art, Topic, Garden Context |
 | Sub-region | `(station_code, climate_zone_id)` | `sub-regions.js` | `{sub_region_description}` → Garden Context |
@@ -529,7 +529,7 @@ One row per object. Every input and output explicit. Every group by defined.
 | Character Souls | `(character_key)` | `persona-*.md` | `{character_souls}` → Garden Context |
 | History | `(climate_zone_id, author_key)` | `archive/` + `daily_runs` | `{history}` → Garden Context |
 | Author Voice | `(author_key)` | `authors.json` | `{author_voice}` → Dialogue |
-| Garden Context | `(season_bucket, condition)` | `{forecast, season_bucket_description, sub_region_description, topic, quote, character_souls, history}` | `{garden_context}` → Dialogue |
+| Garden Context | `(climate zone, sub region, season bucket, condition)` | `{forecast, season bucket description, sub region description, topic, quote, character souls, history}` | `{garden context}` → Dialogue |
 | Title Dict | `(season_bucket, climate_zone_id, condition)` | `title_dict.py` | `{title}` → Masthead |
 | Art | `(condition, season_bucket, season_bucket_description)` | `generate_art.py` (SDXL) | `{png_path}` → Masthead |
 | Masthead | `(png_path, title)` | `generate_masthead.py` (PIL) | `{url}` → Email Template |
