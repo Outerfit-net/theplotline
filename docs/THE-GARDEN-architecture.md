@@ -527,13 +527,13 @@ One row per object. Every input and output explicit. Every group by defined.
 | Topic | `(season_bucket, climate_zone_id)` | `topic_bank_24.py` | `{topic}` → Garden Context |
 | Quote | `(season_bucket)` | `garden_quotes.py` | `{quote}` → Garden Context, Delivery |
 | Character Souls | `(character_key)` | `persona-*.md` | `{character_souls}` → Garden Context |
-| History | `(climate_zone_id, sub_region, author_key)` | `archive/` + `daily_runs` | `{history}` → Garden Context |
+| Prose | `(date, climate_zone_id, sub_region, author_key)` | `archive/` + `daily_runs` | `{prose}` → Garden Context (as past prose), Email Template |
 | Author Voice | `(author_key)` | `authors.json` | `{author_voice}` → Dialogue |
-| Garden Context | `(climate_zone_id, sub_region, season_bucket)` | `{forecast, season_bucket_description, sub_region_description, topic, quote, character_souls, history}` | `{garden_context}` → Dialogue |
+| Garden Context | `(climate_zone_id, sub_region, season_bucket)` | `{forecast, season_bucket_description, sub_region_description, topic, quote, character_souls, past prose}` | `{garden_context}` → Dialogue |
 | Title Dict | `(season_bucket, climate_zone_id, condition)` | `title_dict.py` | `{title}` → Masthead |
 | Art | `(condition, season_bucket, season_bucket_description)` | `generate_art.py` (SDXL) | `{png_path}` → Masthead |
 | Masthead | `(png_path, title)` | `generate_masthead.py` (PIL) | `{url}` → Email Template |
-| Dialogue | `(date, climate_zone_id, sub_region, author_key)` | `{garden_context, author_voice}` | `{prose}` → Email Template |
+| Dialogue | `(date, climate_zone_id, sub_region, author_key)` | `{garden_context, author_voice}` | `{prose}` → Prose |
 | Unsubscribe Token | `(email_address)` | `subscribers` table | `{unsubscribe_token}` → Email Template |
 | Email Template | `(date, climate_zone_id, sub_region, author_key)` | `{url, prose, quote, unsubscribe_token}` | `{html}` → Delivery |
 | Delivery | `(email_address)` | `{html}` | `email sent` |
