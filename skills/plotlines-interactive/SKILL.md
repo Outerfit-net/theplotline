@@ -9,11 +9,12 @@ Run any pipeline stage on demand. Show ALL raw output — never summarize, never
 
 ## Behaviour Rules
 
-- **Never paraphrase output.** Paste raw stdout/stderr verbatim.
-- **Always open images in browser** — `browser(action=open, profile=openclaw)` then `browser(action=screenshot)` — display screenshot inline.
+- **Show the guts.** After every stage, dump the raw output — JSON, prose, logs, all of it. No truncation. No summaries. No pass/fail tables. The user reads it.
+- **Never paraphrase.** Paste raw stdout/stderr verbatim.
+- **Always open images in browser** — `browser(action=open, profile=openclaw)` then `browser(action=screenshot)` — display screenshot inline. Every time.
 - **Log every defect** to `/opt/plotlines/docs/TODO.md`, commit immediately.
-- **Show full prose** after dialogue — all of it, no truncation.
-- **Show full prompt** when asked — no paraphrasing.
+- **Show full prose** after dialogue — every word.
+- **Show full prompt** when asked — every word.
 - **Ask before sending real email.** Never send without explicit confirmation.
 
 ## Setup
@@ -44,8 +45,11 @@ python3 $DISPATCH --date $DATE --no-send \
   --skip-dialogue --skip-art --skip-title --skip-masthead \
   --email EMAIL 2>&1
 ```
-Show: full output + full contents of `runs/$DATE/weather_STATION.json`.
-Check: current obs populated, afd_summary populated, 10-day forecast present.
+Then immediately show the full raw weather JSON — every field, no truncation:
+```bash
+cat /opt/plotlines/data/runs/$DATE/weather_STATION.json
+```
+Show everything. The user reads it. Do not summarize, do not verify on their behalf.
 
 ---
 
@@ -55,8 +59,11 @@ python3 $DISPATCH --date $DATE --no-send \
   --skip-art --skip-title --skip-masthead \
   --email EMAIL 2>&1
 ```
-Show: full output. Read and paste full prose from `runs/$DATE/dialogue_STATION_AUTHOR.json`.
-Check: turns > 1, prose is real (not placeholder), topic is zone-appropriate.
+Then show the full raw dialogue JSON — every field, no truncation:
+```bash
+cat /opt/plotlines/data/runs/$DATE/dialogue_STATION_AUTHOR.json
+```
+Show everything. The user reads it. Do not summarize.
 
 ---
 
@@ -66,8 +73,7 @@ python3 $DISPATCH --date $DATE --no-send \
   --skip-title --skip-masthead \
   --email EMAIL 2>&1
 ```
-Show: full output. Open art PNG in browser, display screenshot.
-Check: garden scene, not literal sekki imagery.
+Show full output. Then open the art PNG in browser and display the screenshot inline. The user looks at it.
 
 ---
 
@@ -77,7 +83,12 @@ python3 $DISPATCH --date $DATE --no-send \
   --skip-masthead \
   --email EMAIL 2>&1
 ```
-Show: full output. Confirm `source=title_dict`, title appropriate for zone+sekki+condition.
+Show full output. Then show the full title_dict row:
+```bash
+psql postgresql://plotlines:plines2026@localhost:5432/plotlines \
+  -c "SELECT season_bucket, climate_zone_id, condition, title FROM title_dict WHERE climate_zone_id = 'ZONE' AND condition = 'CONDITION' AND season_bucket = 'SEKKI';"
+```
+The user reads it.
 
 ---
 
@@ -86,8 +97,7 @@ Show: full output. Confirm `source=title_dict`, title appropriate for zone+sekki
 python3 $DISPATCH --date $DATE --no-send \
   --email EMAIL 2>&1
 ```
-Show: full output. Open masthead URL in browser, display screenshot.
-Check: title text correct, sekki label correct, art appropriate.
+Show full output. Then open the masthead URL in browser and display the screenshot inline. The user looks at it.
 
 ---
 
