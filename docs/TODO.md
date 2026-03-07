@@ -201,3 +201,10 @@ Tests we need that don't exist:
 **Issue:** `--no-send` flag does not prevent email delivery. Dispatch sent 2 emails during masthead stage of step-through when it should have held. The `no_send` value is not being passed correctly through to the `send()` function call path.
 **Fix:** Trace `no_send` through `run_dispatch` → `send()` — likely a missing pass-through somewhere in the call chain.
 **Status:** ⬜ TODO
+
+---
+
+### W3. Test subscribers missing zipcode — never went through Stripe webhook
+**Issue:** BOU/hemingway and KEY/munro subscribers have no zipcode because they were created directly in DB, bypassing the Stripe checkout webhook that backfills `postal_code` from Stripe billing address. The backfill code in `stripe.js` is correct but never fired.
+**Fix:** Manually backfill zipcodes for test subscribers: mdcscry@yahoo.com (80302), moltibot@agentmail.to (80302), outerfit.net@gmail.com (33040). Run UPDATE via admin or psql with encryption.
+**Status:** ⬜ TODO
