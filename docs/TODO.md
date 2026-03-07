@@ -48,7 +48,7 @@
 **File:** `garden-dispatch.py: get_newsletter_title()` call at masthead step
 **Issue:** Title generation doesn't know the zone — can't generate zone-specific titles until title_dict is wired. After P3 is done, update the call to pass `climate_zone_id` too.
 **Fix:** Pass `zone` to `get_newsletter_title()` and on to `get_title()` once P3 is wired
-**Status:** ⬜ TODO (blocked on P3)
+**Status:** ✅ DONE — `climate_zone_id` was already being passed through (TODO was stale). title_dict cleaned up: deleted `foggy` rows (never matches), added `frost` + `heat` for all 3 active zones × current season_bucket. 21 rows, all 3 zones × 7 conditions covered. Condition buckets expanded to 7 (added `windy`), classify_condition ordering fixed.
 
 ---
 
