@@ -125,18 +125,34 @@ Each character has a `persona-*.md` file in `~/openclaw/skills/garden-conversati
 
 **Flow:**
 ```
-1. User submits signup form → POST /api/subscribe
-2. Geocode: zipcode preferred → fallback "city, state" → Nominatim
-3. lat/lon → NWS points API → station_code
-4. assignClimateZone(lat, lon) → climate_zone_id
-5. Insert subscriber (email encrypted, PII encrypted at rest)
-6. Create/find combination (location_key, author_key)
-7. Send confirmation email → confirm_token link
+1. User submits signup form → POST /api/subscribe (subscribers.js)
+2. Geocode (services/geocode.js):
+   - zipcode preferred → Nominatim postal code search
+   - fallback: "city, state" → Nominatim
+   - returns: {lat, lon}
+3. NWS station lookup (services/nws.js: getStationInfo):
+   - lat/lon → NWS points API → nearest observation station_code
+4. Zone assignment (services/climate.js: assignClimateZone):
+   - (lat, lon, country) → climate_zone_id (bounded region lookup, 28 zones)
+   - (lat) → hemisphere (N if lat >= 0, S if lat < 0)
+5. Insert subscriber (email encrypted, all PII encrypted at rest)
+6. Create/find combination (location_key, author_key, lat, lon, station_code, climate_zone_id, hemisphere)
+7. Send confirmation email → confirm_token link (services/email.js: nodemailer)
 8. User clicks confirm → POST /api/confirm → active=1, confirmed_at=NOW()
 9. User clicks Subscribe → POST /api/stripe/create-checkout → Stripe Checkout
 10. Stripe webhook checkout.session.completed → subscription_status='active'
 11. Webhook backfills zipcode + re-geocodes from Stripe billing address if missing
 ```
+
+**Services involved at signup:**
+
+| Service | File | Role |
+|---------|------|------|
+| Geocoder | `server/services/geocode.js` | city/zip → lat/lon via Nominatim |
+| NWS lookup | `server/services/nws.js` | lat/lon → station_code via NWS points API |
+| Zone assignment | `server/services/climate.js: assignClimateZone()` | lat/lon/country → climate_zone_id (28 bounded regions) |
+| Hemisphere | `server/services/climate.js: getHemisphere()` | lat → N/S |
+| Email | `server/services/email.js` | confirmation email via nodemailer/Gmail SMTP |
 
 ---
 
