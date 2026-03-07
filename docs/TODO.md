@@ -36,7 +36,7 @@
 **File:** `garden-dialogue.py: fetch_garden_context()`
 **Issue:** Context is cached by `location_key` only. Two subscribers in same city but different zones would share context. Minor — but the context prompt also has no zone-specific language injected.
 **Fix:** Cache key should include `climate_zone_id`; prompt should include zone-specific context
-**Status:** ⬜ TODO (low priority)
+**Status:** ✅ DONE — commit `1fcb0cd` — new signature `fetch_garden_context(climate_zone_id, sub_region, season_bucket)`; cache key is `zone:sub_region:season_bucket`; prompt is zone/season-aware; city/state/location_key dropped entirely
 
 ### C10. Prose cache keyed by `(today, author, zone)` — not `(station_code, author, zone)`
 **File:** `garden-dialogue.py: cache_path(today, author, zone)`
