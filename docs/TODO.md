@@ -102,6 +102,16 @@
 
 ## 🟡 WEATHER
 
+### W2. Weather fetch incomplete — missing current obs, AFD, full 10-day
+**Issue:** Weather fetch returns 3 nulls where it should return data:
+1. **Current conditions** — `temp_f`, `wind_mph`, `description` all null (obs station not returning current reading)
+2. **AFD** — `afd_summary` is null — `fetch_weather()` called with `summarize=False`, AFD never processed
+3. **Forecast** — only 7 periods returned, should be 10-day
+**Fix:** Pass `--summarize` to `garden-weather.py` in `_run_weather()`; debug obs station current reading; extend forecast periods.
+**Status:** ⬜ TODO
+
+---
+
 ### W1. Condition bucket not zip-specific
 **Issue:** `classify_condition()` reads the NWS observation station's current reading at 5:30 AM dispatch time. For subscribers like Grand Junction vs Vail — same NWS grid area, very different actual conditions. The right answer is a 6-hour-ahead forecast per zipcode (available from NWS/Open-Meteo but not implemented).
 **Known limitation:** condition drives art and title selection only — not a correctness issue, just a quality one.
