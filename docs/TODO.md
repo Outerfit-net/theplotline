@@ -1,5 +1,5 @@
 # Plot Lines — TODO
-*Last Updated: 2026-03-06*
+*Last Updated: 2026-03-06 (C5 marked done)*
 *Keep this in sync with THE-GARDEN-architecture.md. When a TODO is done, mark it ✅ and note the commit.*
 
 ---
@@ -21,7 +21,7 @@
 ### C5. Node.js server routes still use `?` placeholder shim
 **File:** `server/routes/subscribers.js`, `server/routes/stripe.js`, all routes
 **Issue:** `index.js` has a shim converting `?` → `$1,$2` for Postgres. Works but fragile — any `?` in a string value breaks it. Migrate to native `$1` syntax.
-**Status:** 🔄 IN PROGRESS — agent running (session tidal-haven)
+**Status:** ✅ DONE — commit `5c3628a` — all routes migrated to native `$N` placeholders, shim removed from `index.js`
 
 ### C6. `fallback-prose.py` — purpose unknown
 **Status:** ✅ DONE — commit `b7696ae` — confirmed dead, deleted
