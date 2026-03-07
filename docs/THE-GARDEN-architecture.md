@@ -297,8 +297,8 @@ ORDER BY
 | Title Dict ⚠️ TODO: pre-generate per group by | `(season_bucket, climate_zone_id, condition)` | `{title}` → Masthead |
 | Art | `({condition, season_bucket, season_bucket_description})` | `{png_path}` → Masthead |
 | Masthead | `({png_path, title})` | `{url}` → Delivery |
-| Author Voice | `(author_key)` | `{style_prompt}` → Dialogue |
-| Dialogue | `(author_key, {forecast, season_bucket_description, sub_region_description, topic, quote, style_prompt, character_souls})` | `{prose}` → Delivery |
+| Author Voice | `(author_key)` | `{author_voice}` → Dialogue |
+| Dialogue | `(author_key, {forecast, season_bucket_description, sub_region_description, topic, quote, author_voice, character_souls})` | `{prose}` → Delivery |
 | Unsubscribe Token | `(email_address)` | `{unsubscribe_token}` → Email Template |
 | Email Template | `({url, prose, quote, unsubscribe_token})` | `{html}` → Delivery |
 | Delivery | `(email_address, {html})` | `email sent` |
@@ -456,9 +456,9 @@ All static lookup data used by the pipeline.
 | `generate_art.py` | Art | `({condition, season_bucket, season_bucket_description})` | `{png_path}` |
 | `generate_masthead.py` | Masthead | `({png_path, title})` | `{url}` |
 | `title_dict.py` ⚠️ TODO: doesn't exist | Title Dict | `(season_bucket, climate_zone_id, condition)` | `{title}` |
-| `authors.json` | Author Voice | `(author_key)` | `{style_prompt}` |
+| `authors.json` | Author Voice | `(author_key)` | `{author_voice}` |
 | `persona-*.md` | Character Souls | `(character_key)` | `{character_soul}` |
-| `garden-dialogue.py` | Dialogue | `(author_key, {forecast, season_bucket_description, sub_region_description, topic, quote, style_prompt, character_souls})` | `{prose}` |
+| `garden-dialogue.py` | Dialogue | `(author_key, {forecast, season_bucket_description, sub_region_description, topic, quote, author_voice, character_souls})` | `{prose}` |
 | `garden-assembler.py` | Email Template | `({url, prose, quote, unsubscribe_token})` | `{html}` |
 | `garden-mailer.py` | Delivery | `(email_address, {html})` | `email sent` |
 | `garden-dispatch.py` | Orchestrator | all of the above | coordinates full DAG |
@@ -518,22 +518,25 @@ After dialogue completes, `write_archive()` writes a single `.md` file with:
 
 One row per object. Every input and output explicit. Every group by defined.
 
-| Stage | Group By | Output |
-|-------|----------|--------|
-| Zone Assignment | `(lat, lon, country)` | `{climate_zone_id, hemisphere}` → stored on subscriber at signup, drives all downstream lookups |
-| Weather | `(station_code, zipcode)` | `{condition}` → Art, Title Dict, `{forecast}` → Dialogue |
-| Solar Term | `(climate_zone_id, hemisphere)` | `{season_bucket, season_bucket_description}` → Art, Topic, Dialogue |
-| Sub-region | `(station_code, climate_zone_id)` | `{sub_region_description}` → Dialogue |
-| Topic ⚠️ TODO: generate 14 per `(season_bucket, climate_zone_id)` | `(season_bucket, climate_zone_id)` | `{topic}` → Dialogue |
-| Quote ⚠️ TODO: `garden-quotes.py`, 14 per `season_bucket` | `(season_bucket)` | `{quote}` → Dialogue, Delivery |
-| Title Dict ⚠️ TODO: pre-generate per group by | `(season_bucket, climate_zone_id, condition)` | `{title}` → Masthead |
-| Art | `({condition, season_bucket, season_bucket_description})` | `{png_path}` → Masthead |
-| Masthead | `({png_path, title})` | `{url}` → Delivery |
-| Author Voice | `(author_key)` | `{style_prompt}` → Dialogue |
-| Dialogue | `(author_key, {forecast, season_bucket_description, sub_region_description, topic, quote, style_prompt, character_souls})` | `{prose}` → Delivery |
-| Unsubscribe Token | `(email_address)` | `{unsubscribe_token}` → Email Template |
-| Email Template | `({url, prose, quote, unsubscribe_token})` | `{html}` → Delivery |
-| Delivery | `(email_address, {html})` | `email sent` |
+| Stage | Group By | Inputs | Output |
+|-------|----------|--------|--------|
+| Zone Assignment | `(lat, lon, country)` | signup form | `{climate_zone_id, hemisphere}` → stored on subscriber, drives all downstream lookups |
+| Weather | `(station_code, zipcode)` | NWS + Open-Meteo APIs | `{condition, forecast}` → Art, Title Dict, Garden Context |
+| Solar Term | `(climate_zone_id, hemisphere)` | `garden_seasons.py` | `{season_bucket, season_bucket_description}` → Art, Topic, Garden Context |
+| Sub-region | `(station_code, climate_zone_id)` | `sub-regions.js` | `{sub_region_description}` → Garden Context |
+| Topic | `(season_bucket, climate_zone_id)` | `topic_bank_24.py` | `{topic}` → Garden Context |
+| Quote | `(season_bucket)` | `garden_quotes.py` | `{quote}` → Garden Context, Delivery |
+| Character Souls | `(character_key)` | `persona-*.md` | `{character_souls}` → Garden Context |
+| History | `(station_code, author_key, date)` | `archive/` + `daily_runs` | `{history}` → Garden Context |
+| Author Voice | `(author_key)` | `authors.json` | `{author_voice}` → Dialogue |
+| Garden Context | `(season_bucket, condition)` | `{forecast, season_bucket_description, sub_region_description, topic, quote, character_souls, history}` | `{garden_context}` → Dialogue |
+| Title Dict | `(season_bucket, climate_zone_id, condition)` | `title_dict.py` | `{title}` → Masthead |
+| Art | `(condition, season_bucket, season_bucket_description)` | `generate_art.py` (SDXL) | `{png_path}` → Masthead |
+| Masthead | `(png_path, title)` | `generate_masthead.py` (PIL) | `{url}` → Email Template |
+| Dialogue | `(climate_zone_id, author_key)` | `{garden_context, author_voice}` | `{prose}` → Email Template |
+| Unsubscribe Token | `(email_address)` | `subscribers` table | `{unsubscribe_token}` → Email Template |
+| Email Template | `(climate_zone_id, author_key)` | `{url, prose, quote, unsubscribe_token}` | `{html}` → Delivery |
+| Delivery | `(email_address)` | `{html}` | `email sent` |
 
 ---
 
@@ -554,9 +557,9 @@ One row per object. Every input and output explicit. Every group by defined.
 | `title_dict.py` ⚠️ TODO: doesn't exist | Title Dict | `(season_bucket, climate_zone_id, condition)` |
 | `authors.json` | Author Voice (15 voices) | `(author_key)` |
 | `persona-*.md` (12 files) | Character Souls | `(character_key)` |
-| `garden-context-cache.json` | Garden context description | `(station_code)` |
-| `archive/<station>/<author>/YYYY-MM-DD.md` | Dialogue history | `(station_code, author_key, date)` |
-| `garden-dialogue.py` | Dialogue | `(author_key, {forecast, season_bucket_description, sub_region_description, topic, quote, style_prompt, character_souls})` |
+| `garden-context-cache.json` | Garden Context | `(season_bucket, condition)` |
+| `archive/<station>/<author>/YYYY-MM-DD.md` + `daily_runs` | History | `(station_code, author_key, date)` |
+| `garden-dialogue.py` | Garden Context + Dialogue | `(climate_zone_id, author_key)` |
 | `garden-assembler.py` | Email Template | `({url, prose, quote, unsubscribe_token})` |
 | `garden-mailer.py` | Delivery | `(email_address, {html})` |
 | `garden-dispatch.py` | Orchestrator | all objects |
@@ -680,7 +683,7 @@ flowchart TD
     SUBR["sub-regions.js\n(station_code, climate_zone_id)\n→ {sub_region_description}"]
     TOPIC["topic_bank_24.py ⚠️TODO\n(season_bucket, climate_zone_id)\n→ {topic}"]
     QUOTE["garden-quotes.py ⚠️TODO\n(season_bucket)\n→ {quote}"]
-    AUTH["authors.json\n(author_key)\n→ {style_prompt}"]
+    AUTH["authors.json\n(author_key)\n→ {author_voice}"]
     CHARS["persona-*.md\n(character_key)\n→ {character_souls}"]
     ARCHIVE[("archive/station/author/\nYYYY-MM-DD.md\nlast 7 days")]
     TITLEDICT["title_dict.py ⚠️TODO\n(season_bucket, climate_zone_id, condition)\n→ {title}"]
