@@ -207,11 +207,11 @@ Do not include any other text, explanation, or markdown. Just the JSON array.`;
  */
 async function getSeasonNames(climateZoneId, authorKey, db) {
   // Check cache first
-  const cached = await db.prepare(`
+  const { rows: cached } = await db.query(`
     SELECT * FROM author_season_names
-    WHERE climate_zone_id = ? AND author_key = ?
+    WHERE climate_zone_id = $1 AND author_key = $2
     ORDER BY season_number
-  `).all(climateZoneId, authorKey);
+  `, [climateZoneId, authorKey]);
 
   if (cached.length === 12) {
     console.log(`[seasonNames] Cache hit: ${climateZoneId}/${authorKey}`);
@@ -221,11 +221,11 @@ async function getSeasonNames(climateZoneId, authorKey, db) {
   console.log(`[seasonNames] Cache miss: ${climateZoneId}/${authorKey} (found ${cached.length}/12)`);
 
   // Load micro-seasons from DB
-  const microSeasons = await db.prepare(`
+  const { rows: microSeasons } = await db.query(`
     SELECT season_number, name, observable_signal FROM micro_seasons
-    WHERE climate_zone_id = ?
+    WHERE climate_zone_id = $1
     ORDER BY season_number
-  `).all(climateZoneId);
+  `, [climateZoneId]);
 
   if (microSeasons.length !== 12) {
     throw new Error(`Expected 12 micro-seasons for ${climateZoneId}, found ${microSeasons.length}`);
@@ -237,26 +237,27 @@ async function getSeasonNames(climateZoneId, authorKey, db) {
 
   // Store all 12 in DB (sequential inserts)
   for (const item of generatedNames) {
-    await db.prepare(`
+    await db.query(`
       INSERT INTO author_season_names (id, climate_zone_id, author_key, season_number, season_name)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(
+      VALUES ($1, $2, $3, $4, $5)
+    `, [
       uuidv4(),
       climateZoneId,
       authorKey,
       item.season_number,
       item.name
-    );
+    ]);
   }
 
   console.log(`[seasonNames] Stored ${generatedNames.length} season names`);
 
   // Return from DB (to get all fields including id and generated_at)
-  return await db.prepare(`
+  const { rows } = await db.query(`
     SELECT * FROM author_season_names
-    WHERE climate_zone_id = ? AND author_key = ?
+    WHERE climate_zone_id = $1 AND author_key = $2
     ORDER BY season_number
-  `).all(climateZoneId, authorKey);
+  `, [climateZoneId, authorKey]);
+  return rows;
 }
 
 /**

@@ -259,24 +259,24 @@ function getDayOfYear(date, hemisphere = 'N') {
 
 /**
  * Look up the current micro-season for a climate zone
- * @param {object} db - better-sqlite3 instance
+ * @param {object} db - pg Pool or compatible (must have .query())
  * @param {string} climateZoneId
  * @param {string} hemisphere
  * @param {Date} date - defaults to now
- * @returns {object|null} micro_season row
+ * @returns {Promise<object|null>} micro_season row
  */
-function getCurrentMicroSeason(db, climateZoneId, hemisphere = 'N', date = new Date()) {
+async function getCurrentMicroSeason(db, climateZoneId, hemisphere = 'N', date = new Date()) {
   const doy = getDayOfYear(date, hemisphere);
 
   // Find micro-season that contains this day
-  const season = db.prepare(`
+  const { rows: [season] } = await db.query(`
     SELECT * FROM micro_seasons
-    WHERE climate_zone_id = ?
-      AND day_of_year_start <= ?
-      AND day_of_year_end >= ?
+    WHERE climate_zone_id = $1
+      AND day_of_year_start <= $2
+      AND day_of_year_end >= $3
     ORDER BY day_of_year_start DESC
     LIMIT 1
-  `).get(climateZoneId, doy, doy);
+  `, [climateZoneId, doy, doy]);
 
   if (season) {
     season.topic_weights = JSON.parse(season.topic_weights || '{}');
@@ -284,12 +284,12 @@ function getCurrentMicroSeason(db, climateZoneId, hemisphere = 'N', date = new D
   }
 
   // Fallback: nearest season
-  const nearest = db.prepare(`
+  const { rows: [nearest] } = await db.query(`
     SELECT * FROM micro_seasons
-    WHERE climate_zone_id = ?
-    ORDER BY ABS(day_of_year_start - ?) ASC
+    WHERE climate_zone_id = $1
+    ORDER BY ABS(day_of_year_start - $2) ASC
     LIMIT 1
-  `).get(climateZoneId, doy);
+  `, [climateZoneId, doy]);
 
   if (nearest) {
     nearest.topic_weights = JSON.parse(nearest.topic_weights || '{}');

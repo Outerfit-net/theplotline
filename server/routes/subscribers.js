@@ -112,9 +112,10 @@ async function subscriberRoutes(fastify) {
     try {
       // Check existing — use deterministic hash for lookup (pgp_sym_encrypt is non-deterministic)
       const emailHash = require('crypto').createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
-      const existing = await db.prepare(
-        'SELECT id, active, confirmed_at, subscription_status FROM subscribers WHERE email_hash = ?'
-      ).get(emailHash);
+      const { rows: [existing] } = await db.query(
+        'SELECT id, active, confirmed_at, subscription_status FROM subscribers WHERE email_hash = $1',
+        [emailHash]
+      );
 
       if (existing) {
         // Block only if they have an active PAID subscription
@@ -124,27 +125,27 @@ async function subscriberRoutes(fastify) {
             message: 'This email already has an active paid subscription.'
           });
         }
-        
+
         // If they have a free newsletter but no paid sub, let them proceed to checkout
         // Reactivate or resend
         const confirmToken = generateToken();
         const unsubscribeToken = generateToken();
         if (!existing.active) {
-          await db.prepare(`
+          await db.query(`
             UPDATE subscribers SET active=1, unsubscribed_at=NULL,
-              confirm_token=?, unsubscribe_token=?, management_token=?,
+              confirm_token=$1, unsubscribe_token=$2, management_token=$3,
               auth_token_expires_at=NOW() + INTERVAL '1 year',
-              location_city_enc=pgp_sym_encrypt(?::text, ?),
-              location_state_enc=pgp_sym_encrypt(?::text, ?),
-              location_country=?, author_key=?,
-              zipcode_enc=pgp_sym_encrypt(?::text, ?),
+              location_city_enc=pgp_sym_encrypt($4::text, $5),
+              location_state_enc=pgp_sym_encrypt($6::text, $7),
+              location_country=$8, author_key=$9,
+              zipcode_enc=pgp_sym_encrypt($10::text, $11),
               subscribed_at=NOW()
-            WHERE id=?
-          `).run(confirmToken, unsubscribeToken, uuidv4(), city, encKey, state || '', encKey, country, author, zipcode || '', encKey, existing.id);
+            WHERE id=$12
+          `, [confirmToken, unsubscribeToken, uuidv4(), city, encKey, state || '', encKey, country, author, zipcode || '', encKey, existing.id]);
           await sendConfirmationEmail(email, confirmToken);
           return reply.code(200).send({ message: 'Subscription reactivated. Please check your email to confirm.' });
         }
-        await db.prepare('UPDATE subscribers SET confirm_token=? WHERE id=?').run(confirmToken, existing.id);
+        await db.query('UPDATE subscribers SET confirm_token=$1 WHERE id=$2', [confirmToken, existing.id]);
         await sendConfirmationEmail(email, confirmToken);
         return reply.code(200).send({ message: 'Confirmation email resent. Please check your inbox.' });
       }
@@ -197,18 +198,18 @@ async function subscriberRoutes(fastify) {
 
       const newEmailHash = require('crypto').createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
 
-      await db.prepare(`
+      await db.query(`
         INSERT INTO subscribers (
           id, email_enc, email_hash, location_city_enc, location_state_enc, location_country, zipcode_enc,
           lat, lon, lat_enc, lon_enc, hemisphere, author_key, climate_zone_id, station_code,
           confirm_token, unsubscribe_token, management_token
         ) VALUES (
-          ?, pgp_sym_encrypt(?::text, ?), ?, pgp_sym_encrypt(?::text, ?), pgp_sym_encrypt(?::text, ?),
-          ?, pgp_sym_encrypt(?::text, ?),
-          ?, ?, pgp_sym_encrypt(?::text, ?), pgp_sym_encrypt(?::text, ?),
-          ?, ?, ?, ?, ?, ?, ?
+          $1, pgp_sym_encrypt($2::text, $3), $4, pgp_sym_encrypt($5::text, $6), pgp_sym_encrypt($7::text, $8),
+          $9, pgp_sym_encrypt($10::text, $11),
+          $12, $13, pgp_sym_encrypt($14::text, $15), pgp_sym_encrypt($16::text, $17),
+          $18, $19, $20, $21, $22, $23, $24
         )
-      `).run(
+      `, [
         id,
         email, encKey, newEmailHash,
         city, encKey,
@@ -220,29 +221,30 @@ async function subscriberRoutes(fastify) {
         lon !== null ? String(lon) : '', encKey,
         hemisphere, author, climateZoneId, stationCode,
         confirmToken, unsubscribeToken, managementToken
-      );
+      ]);
 
       // ── Create or find combination ────────────────────────────────────────
       if (lat !== null) {
         const locationKey = buildLocationKey(country, stationCode, lat, lon);
-        const existingCombo = await db.prepare(
-          'SELECT id FROM combinations WHERE location_key=? AND author_key=?'
-        ).get(locationKey, author);
+        const { rows: [existingCombo] } = await db.query(
+          'SELECT id FROM combinations WHERE location_key=$1 AND author_key=$2',
+          [locationKey, author]
+        );
 
         if (!existingCombo) {
-          await db.prepare(`
+          await db.query(`
             INSERT INTO combinations (
               id, location_key, author_key, climate_zone_id,
               location_city, location_state, location_country,
               lat, lon, hemisphere, station_code,
               weather_source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          `, [
             uuidv4(), locationKey, author, climateZoneId,
             city, state || '', country,
             lat, lon, hemisphere, stationCode,
             country.toUpperCase() === 'US' ? 'nws' : 'open-meteo'
-          );
+          ]);
         }
       }
 
@@ -299,9 +301,10 @@ async function subscriberRoutes(fastify) {
     `;
 
     try {
-      const subscriber = await db.prepare(
-        'SELECT id, pgp_sym_decrypt(email_enc, ?)::text AS email, confirmed_at FROM subscribers WHERE confirm_token=?'
-      ).get(encKey, token);
+      const { rows: [subscriber] } = await db.query(
+        'SELECT id, pgp_sym_decrypt(email_enc, $1)::text AS email, confirmed_at FROM subscribers WHERE confirm_token=$2',
+        [encKey, token]
+      );
 
       if (!subscriber) {
         return reply.type('text/html').send(htmlPage('Invalid Link', 'This confirmation link is invalid or has expired.'));
@@ -311,9 +314,10 @@ async function subscriberRoutes(fastify) {
         return reply.type('text/html').send(htmlPage('Already Confirmed', 'Your email was already confirmed. You\'re all set!'));
       }
 
-      await db.prepare(
-        "UPDATE subscribers SET confirmed_at=NOW(), subscribed_at=NOW(), confirm_token=NULL WHERE id=?"
-      ).run(subscriber.id);
+      await db.query(
+        "UPDATE subscribers SET confirmed_at=NOW(), subscribed_at=NOW(), confirm_token=NULL WHERE id=$1",
+        [subscriber.id]
+      );
 
       return reply.redirect(`${clientUrl}?confirmed=true&email=${encodeURIComponent(subscriber.email)}`);
     } catch (err) {
@@ -328,9 +332,10 @@ async function subscriberRoutes(fastify) {
   async function handleUnsubscribe(db, token, reply) {
     if (!token) return reply.code(400).send({ error: 'Missing unsubscribe token' });
     try {
-      const subscriber = await db.prepare(
-        'SELECT id, auth_token_expires_at FROM subscribers WHERE unsubscribe_token=?'
-      ).get(token);
+      const { rows: [subscriber] } = await db.query(
+        'SELECT id, auth_token_expires_at FROM subscribers WHERE unsubscribe_token=$1',
+        [token]
+      );
 
       if (!subscriber) return reply.code(404).send({ error: 'Invalid unsubscribe token' });
 
@@ -342,9 +347,10 @@ async function subscriberRoutes(fastify) {
         }
       }
 
-      await db.prepare(
-        "UPDATE subscribers SET active=0, unsubscribed_at=NOW() WHERE id=?"
-      ).run(subscriber.id);
+      await db.query(
+        "UPDATE subscribers SET active=0, unsubscribed_at=NOW() WHERE id=$1",
+        [subscriber.id]
+      );
 
       return reply.code(200).send({ message: 'Successfully unsubscribed' });
     } catch (err) {
@@ -358,19 +364,19 @@ async function subscriberRoutes(fastify) {
     const { token } = request.params;
     const db = fastify.db;
     try {
-      const sub = await db.prepare(`
+      const { rows: [sub] } = await db.query(`
         SELECT s.id,
-               pgp_sym_decrypt(s.email_enc, ?)::text AS email,
-               pgp_sym_decrypt(s.location_city_enc, ?)::text AS location_city,
-               pgp_sym_decrypt(s.location_state_enc, ?)::text AS location_state,
+               pgp_sym_decrypt(s.email_enc, $1)::text AS email,
+               pgp_sym_decrypt(s.location_city_enc, $2)::text AS location_city,
+               pgp_sym_decrypt(s.location_state_enc, $3)::text AS location_state,
                s.location_country,
                s.author_key, s.climate_zone_id, s.active, s.confirmed_at,
                s.auth_token_expires_at,
                cz.name as climate_zone_name
         FROM subscribers s
         LEFT JOIN climate_zones cz ON cz.id = s.climate_zone_id
-        WHERE s.unsubscribe_token = ?
-      `).get(encKey, encKey, encKey, token);
+        WHERE s.unsubscribe_token = $4
+      `, [encKey, encKey, encKey, token]);
 
       if (!sub) return reply.code(404).send({ error: 'Not found' });
 
@@ -392,7 +398,7 @@ async function subscriberRoutes(fastify) {
   fastify.get('/climate-zones', async (request, reply) => {
     const db = fastify.db;
     try {
-      const zones = await db.prepare('SELECT * FROM climate_zones ORDER BY name').all();
+      const { rows: zones } = await db.query('SELECT * FROM climate_zones ORDER BY name');
       return reply.code(200).send({ zones });
     } catch (err) {
       return reply.code(500).send({ error: 'Failed to fetch climate zones' });

@@ -111,7 +111,7 @@ function generateBetaCode() {
  * Check if beta code already exists in database
  */
 async function betaCodeExists(db, code) {
-  const result = await db.prepare('SELECT 1 FROM beta_invites WHERE code = ? LIMIT 1').get(code);
+  const { rows: [result] } = await db.query('SELECT 1 FROM beta_invites WHERE code = $1 LIMIT 1', [code]);
   return !!result;
 }
 
@@ -119,12 +119,13 @@ async function betaCodeExists(db, code) {
  * Check if email already has an active invite
  */
 async function getExistingInvite(db, email) {
-  return await db.prepare(`
+  const { rows: [invite] } = await db.query(`
     SELECT id, email, code, status, created_at
     FROM beta_invites
-    WHERE email = ? AND status IN ('pending', 'sent')
+    WHERE email = $1 AND status IN ('pending', 'sent')
     LIMIT 1
-  `).get(email);
+  `, [email]);
+  return invite;
 }
 
 /**
@@ -146,7 +147,7 @@ async function adminRoutes(fastify) {
   try {
     const db = fastify.db;
     if (db) {
-      await db.prepare(`
+      await db.query(`
         CREATE TABLE IF NOT EXISTS beta_invites (
           id TEXT PRIMARY KEY,
           email TEXT NOT NULL,
@@ -156,7 +157,7 @@ async function adminRoutes(fastify) {
           sent_at TEXT,
           failed_at TEXT
         )
-      `).run();
+      `);
     }
   } catch (err) {
     fastify.log.error('Failed to initialize beta_invites table:', err);
@@ -217,30 +218,34 @@ async function adminRoutes(fastify) {
     try {
       // Only count active subscribers (active=1 AND not canceled)
       // Note: test subs may have subscription_status=NULL (no Stripe subscription), which is fine
-      const totalSubscribers = (await db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE active=1 AND (subscription_status IS NULL OR subscription_status != \'canceled\')').get()).n;
-      const confirmed = (await db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE confirmed_at IS NOT NULL').get()).n;
-      const active = (await db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE active=1 AND (subscription_status IS NULL OR subscription_status != \'canceled\')').get()).n;
+      const { rows: [totalRow] } = await db.query('SELECT COUNT(*) as n FROM subscribers WHERE active=1 AND (subscription_status IS NULL OR subscription_status != \'canceled\')');
+      const totalSubscribers = totalRow.n;
+      const { rows: [confirmedRow] } = await db.query('SELECT COUNT(*) as n FROM subscribers WHERE confirmed_at IS NOT NULL');
+      const confirmed = confirmedRow.n;
+      const { rows: [activeRow] } = await db.query('SELECT COUNT(*) as n FROM subscribers WHERE active=1 AND (subscription_status IS NULL OR subscription_status != \'canceled\')');
+      const active = activeRow.n;
       const today = new Date().toISOString().slice(0,10);
       // Use subscribed_at (updated on reactivation) not created_at (immutable original signup)
-      const newToday = (await db.prepare('SELECT COUNT(*) as n FROM subscribers WHERE active=1 AND date(subscribed_at)=? AND (subscription_status IS NULL OR subscription_status != \'canceled\')').get(today)).n;
+      const { rows: [newTodayRow] } = await db.query('SELECT COUNT(*) as n FROM subscribers WHERE active=1 AND date(subscribed_at)=$1 AND (subscription_status IS NULL OR subscription_status != \'canceled\')', [today]);
+      const newToday = newTodayRow.n;
 
-      const byZone = await db.prepare(`
+      const { rows: byZone } = await db.query(`
         SELECT climate_zone_id, COUNT(*) as n
         FROM subscribers
         WHERE active=1 AND confirmed_at IS NOT NULL
         GROUP BY climate_zone_id
         ORDER BY n DESC
-      `).all();
+      `);
 
-      const recentSubs = await db.prepare(`
-        SELECT pgp_sym_decrypt(email_enc, ?)::text AS email,
-               pgp_sym_decrypt(location_city_enc, ?)::text AS location_city,
+      const { rows: recentSubs } = await db.query(`
+        SELECT pgp_sym_decrypt(email_enc, $1)::text AS email,
+               pgp_sym_decrypt(location_city_enc, $2)::text AS location_city,
                location_country, climate_zone_id, created_at, subscribed_at
         FROM subscribers
         WHERE active=1 AND (subscription_status IS NULL OR subscription_status != 'canceled')
         ORDER BY subscribed_at DESC
         LIMIT 10
-      `).all(encKey, encKey);
+      `, [encKey, encKey]);
 
       return {
         subscribers: { total: totalSubscribers, confirmed, active, newToday },
@@ -295,10 +300,10 @@ async function adminRoutes(fastify) {
       const betaCode = await generateUniqueBetaCode(db);
 
       // Step 1: Insert DB row with status='pending' FIRST (before Stripe creation)
-      await db.prepare(`
+      await db.query(`
         INSERT INTO beta_invites (id, email, code, status, created_at)
-        VALUES (?, ?, ?, 'pending', NOW())
-      `).run(inviteId, email, betaCode);
+        VALUES ($1, $2, $3, 'pending', NOW())
+      `, [inviteId, email, betaCode]);
 
       fastify.log.info(`[BETA] DB record created (pending) for ${email} with code ${betaCode}`);
 
@@ -363,11 +368,11 @@ Any questions? Reply to this email or reach out to hello@theplotline.net`;
       fastify.log.info(`[BETA] Sent invite email to ${email}`);
 
       // Step 4: Update DB status to 'sent'
-      await db.prepare(`
+      await db.query(`
         UPDATE beta_invites
         SET status = 'sent', sent_at = NOW()
-        WHERE id = ?
-      `).run(inviteId);
+        WHERE id = $1
+      `, [inviteId]);
 
       return { success: true, code: betaCode, email, status: 'sent' };
 
@@ -376,11 +381,11 @@ Any questions? Reply to this email or reach out to hello@theplotline.net`;
 
       // If DB record was created, mark as failed
       try {
-        await db.prepare(`
+        await db.query(`
           UPDATE beta_invites
           SET status = 'failed', failed_at = NOW()
-          WHERE id = ?
-        `).run(inviteId);
+          WHERE id = $1
+        `, [inviteId]);
       } catch (updateErr) {
         fastify.log.error('Failed to update beta invite status to failed:', updateErr);
       }
@@ -406,11 +411,11 @@ Any questions? Reply to this email or reach out to hello@theplotline.net`;
     }
 
     try {
-      const invites = await db.prepare(`
+      const { rows: invites } = await db.query(`
         SELECT email, code, status, created_at, sent_at, failed_at
         FROM beta_invites
         ORDER BY created_at DESC
-      `).all();
+      `);
 
       return { invites };
     } catch (err) {

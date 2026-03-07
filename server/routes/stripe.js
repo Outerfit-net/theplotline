@@ -32,18 +32,18 @@ async function stripeRoutes(fastify) {
 
     const db = fastify.db;
     try {
-      const subscriber = await db.prepare(`
+      const { rows: [subscriber] } = await db.query(`
         SELECT
           id,
-          pgp_sym_decrypt(email_enc, ?)::text AS email,
-          pgp_sym_decrypt(location_city_enc, ?)::text AS location_city,
-          pgp_sym_decrypt(location_state_enc, ?)::text AS location_state,
-          pgp_sym_decrypt(zipcode_enc, ?)::text AS zipcode,
+          pgp_sym_decrypt(email_enc, $1)::text AS email,
+          pgp_sym_decrypt(location_city_enc, $2)::text AS location_city,
+          pgp_sym_decrypt(location_state_enc, $3)::text AS location_state,
+          pgp_sym_decrypt(zipcode_enc, $4)::text AS zipcode,
           plan, subscription_status, subscription_end_date, stripe_subscription_id
         FROM subscribers
-        WHERE email_enc = pgp_sym_encrypt(?::text, ?) AND management_token = ?
+        WHERE email_enc = pgp_sym_encrypt($5::text, $6) AND management_token = $7
         LIMIT 1
-      `).get(encKey, encKey, encKey, encKey, email, encKey, token);
+      `, [encKey, encKey, encKey, encKey, email, encKey, token]);
 
       if (!subscriber) {
         return reply.code(401).send({ error: 'Invalid email or token' });
@@ -76,15 +76,15 @@ async function stripeRoutes(fastify) {
 
     const db = fastify.db;
     try {
-      const subscriber = await db.prepare(`
+      const { rows: [subscriber] } = await db.query(`
         SELECT
           id,
-          pgp_sym_decrypt(email_enc, ?)::text AS email,
+          pgp_sym_decrypt(email_enc, $1)::text AS email,
           stripe_subscription_id, subscription_end_date
         FROM subscribers
-        WHERE email_enc = pgp_sym_encrypt(?::text, ?) AND management_token = ?
+        WHERE email_enc = pgp_sym_encrypt($2::text, $3) AND management_token = $4
         LIMIT 1
-      `).get(encKey, email, encKey, token);
+      `, [encKey, email, encKey, token]);
 
       if (!subscriber) {
         return reply.code(401).send({ error: 'Invalid email or token' });
@@ -103,13 +103,13 @@ async function stripeRoutes(fastify) {
       }
 
       // Update subscription status in DB only after Stripe succeeds
-      await db.prepare(`
+      await db.query(`
         UPDATE subscribers
         SET subscription_status = 'canceled',
             active = 0,
             cancelled_at = NOW()
-        WHERE id = ?
-      `).run(subscriber.id);
+        WHERE id = $1
+      `, [subscriber.id]);
 
       return reply.send({
         success: true,
@@ -132,11 +132,11 @@ async function stripeRoutes(fastify) {
 
     const db = fastify.db;
     try {
-      const subscriber = await db.prepare(`
-        SELECT id, pgp_sym_decrypt(email_enc, ?)::text AS email, plan FROM subscribers
-        WHERE email_enc = pgp_sym_encrypt(?::text, ?) AND management_token = ?
+      const { rows: [subscriber] } = await db.query(`
+        SELECT id, pgp_sym_decrypt(email_enc, $1)::text AS email, plan FROM subscribers
+        WHERE email_enc = pgp_sym_encrypt($2::text, $3) AND management_token = $4
         LIMIT 1
-      `).get(encKey, email, encKey, token);
+      `, [encKey, email, encKey, token]);
 
       if (!subscriber) {
         return reply.code(401).send({ error: 'Invalid email or token' });
@@ -146,7 +146,7 @@ async function stripeRoutes(fastify) {
       const referrerPlan = (subscriber.plan === 'weekly') ? 'weekly' : 'monthly';
 
       // Check if referral code already exists
-      let referralRow = await db.prepare('SELECT code FROM referrals WHERE referrer_id = ?').get(subscriber.id);
+      const { rows: [referralRow] } = await db.query('SELECT code FROM referrals WHERE referrer_id = $1', [subscriber.id]);
 
       let code;
       if (referralRow) {
@@ -154,10 +154,10 @@ async function stripeRoutes(fastify) {
       } else {
         // Generate new referral code
         code = 'REF-' + crypto.randomBytes(4).toString('hex').toUpperCase();
-        await db.prepare(`
+        await db.query(`
           INSERT INTO referrals (id, referrer_id, code, created_at)
-          VALUES (?, ?, ?, NOW())
-        `).run(uuidv4(), subscriber.id, code);
+          VALUES ($1, $2, $3, NOW())
+        `, [uuidv4(), subscriber.id, code]);
       }
 
       return reply.send({
@@ -192,11 +192,11 @@ async function stripeRoutes(fastify) {
     const db = fastify.db;
     try {
       // Verify gifter
-      const gifter = await db.prepare(`
-        SELECT id, pgp_sym_decrypt(email_enc, ?)::text AS email, subscription_status FROM subscribers
-        WHERE email_enc = pgp_sym_encrypt(?::text, ?) AND management_token = ?
+      const { rows: [gifter] } = await db.query(`
+        SELECT id, pgp_sym_decrypt(email_enc, $1)::text AS email, subscription_status FROM subscribers
+        WHERE email_enc = pgp_sym_encrypt($2::text, $3) AND management_token = $4
         LIMIT 1
-      `).get(encKey, gifterEmail, encKey, gifterToken);
+      `, [encKey, gifterEmail, encKey, gifterToken]);
 
       if (!gifter) {
         return reply.code(401).send({ error: 'Invalid gifter email or token' });
@@ -209,10 +209,10 @@ async function stripeRoutes(fastify) {
 
       // Check rate limit: max 5 gifts per day per subscriber
       const today = new Date().toISOString().split('T')[0];
-      const giftCount = await db.prepare(`
+      const { rows: [giftCount] } = await db.query(`
         SELECT COUNT(*) as count FROM gifts
-        WHERE gifter_id = ? AND date(sent_at) = ?
-      `).get(gifter.id, today);
+        WHERE gifter_id = $1 AND date(sent_at) = $2
+      `, [gifter.id, today]);
 
       if (giftCount.count >= 5) {
         return reply.code(429).send({ error: 'Rate limit exceeded: maximum 5 gifts per day' });
@@ -240,10 +240,10 @@ async function stripeRoutes(fastify) {
       }
 
       // Log gift to database
-      await db.prepare(`
+      await db.query(`
         INSERT INTO gifts (id, gifter_id, recipient_email, code, sent_at)
-        VALUES (?, ?, ?, ?, NOW())
-      `).run(uuidv4(), gifter.id, recipientEmail, promoCode);
+        VALUES ($1, $2, $3, $4, NOW())
+      `, [uuidv4(), gifter.id, recipientEmail, promoCode]);
 
       // Send gift email
       const gifterName = htmlEscape(gifter.email.split('@')[0]);
@@ -337,13 +337,13 @@ If you're not interested, you can ignore this email.
     try {
       // If promoCode is a referral code (starts with REF-), enforce the referrer's plan
       if (promoCode && promoCode.startsWith('REF-')) {
-        const referral = await db.prepare(`
+        const { rows: [referral] } = await db.query(`
           SELECT r.referrer_id, s.plan
           FROM referrals r
           JOIN subscribers s ON r.referrer_id = s.id
-          WHERE r.code = ? AND r.redeemed_at IS NULL
+          WHERE r.code = $1 AND r.redeemed_at IS NULL
           LIMIT 1
-        `).get(promoCode);
+        `, [promoCode]);
 
         if (referral && referral.plan) {
           // Use referrer's plan
@@ -354,7 +354,7 @@ If you're not interested, you can ignore this email.
       // Look up subscriber by email if no subscriberId provided
       let resolvedSubscriberId = subscriberId;
       if (!resolvedSubscriberId) {
-        const sub = await db.prepare('SELECT id FROM subscribers WHERE email_enc = pgp_sym_encrypt(?::text, ?) LIMIT 1').get(email, encKey);
+        const { rows: [sub] } = await db.query('SELECT id FROM subscribers WHERE email_enc = pgp_sym_encrypt($1::text, $2) LIMIT 1', [email, encKey]);
         if (sub) {
           resolvedSubscriberId = sub.id;
         }
@@ -373,7 +373,7 @@ If you're not interested, you can ignore this email.
 
       // Store Stripe customer ID in DB if subscriber exists
       if (resolvedSubscriberId) {
-        await db.prepare('UPDATE subscribers SET stripe_customer_id = ? WHERE id = ?').run(stripeCustomerId, resolvedSubscriberId);
+        await db.query('UPDATE subscribers SET stripe_customer_id = $1 WHERE id = $2', [stripeCustomerId, resolvedSubscriberId]);
       }
 
       // Get price ID from environment
@@ -484,39 +484,41 @@ If you're not interested, you can ignore this email.
             const endDate = new Date();
             endDate.setDate(endDate.getDate() + (plan === 'annual' ? 365 : plan === 'monthly' ? 30 : 7));
 
-            await db.prepare(`
+            await db.query(`
               UPDATE subscribers
-              SET stripe_customer_id = ?,
-                  stripe_subscription_id = ?,
-                  plan = ?,
-                  subscription_status = ?,
-                  subscription_end_date = ?,
+              SET stripe_customer_id = $1,
+                  stripe_subscription_id = $2,
+                  plan = $3,
+                  subscription_status = $4,
+                  subscription_end_date = $5,
                   confirmed_at = COALESCE(confirmed_at, NOW()),
                   confirm_token = NULL
-              WHERE id = ?
-            `).run(
+              WHERE id = $6
+            `, [
               session.customer,
               session.subscription,
               plan,
               'active',
               endDate.toISOString().split('T')[0],
               subscriberId
-            );
+            ]);
 
             // ── Backfill zipcode + re-geocode from Stripe billing address if not provided ──
             const sessionPostalCode = session.customer_details?.address?.postal_code;
             if (sessionPostalCode) {
-              const existing = await db.prepare(
-                `SELECT pgp_sym_decrypt(zipcode_enc, $1)::text AS zipcode, lat, lon FROM subscribers WHERE id = $2`
-              ).get(encKey, subscriberId);
+              const { rows: [existing] } = await db.query(
+                `SELECT pgp_sym_decrypt(zipcode_enc, $1)::text AS zipcode, lat, lon FROM subscribers WHERE id = $2`,
+                [encKey, subscriberId]
+              );
               const needsZip = !existing?.zipcode;
               const needsGeo = !existing?.lat;
 
               // Backfill zip from Stripe only if subscriber didn't provide one
               if (needsZip) {
-                await db.prepare(
-                  `UPDATE subscribers SET zipcode_enc = pgp_sym_encrypt($1, $2) WHERE id = $3`
-                ).run(sessionPostalCode, encKey, subscriberId);
+                await db.query(
+                  `UPDATE subscribers SET zipcode_enc = pgp_sym_encrypt($1, $2) WHERE id = $3`,
+                  [sessionPostalCode, encKey, subscriberId]
+                );
                 fastify.log.info(`[webhook] backfilled zip ${sessionPostalCode} for ${subscriberId}`);
               }
 
@@ -527,12 +529,13 @@ If you're not interested, you can ignore this email.
                   const geo = await geocode(zipForGeo, 'US');
                   if (geo) {
                     const zoneId = assignClimateZone(geo.lat, geo.lon, 'US');
-                    await db.prepare(
+                    await db.query(
                       `UPDATE subscribers SET lat = $1, lon = $2,
                         lat_enc = pgp_sym_encrypt($3::text, $4),
                         lon_enc = pgp_sym_encrypt($5::text, $6),
-                        climate_zone_id = $7 WHERE id = $8`
-                    ).run(geo.lat, geo.lon, String(geo.lat), encKey, String(geo.lon), encKey, zoneId, subscriberId);
+                        climate_zone_id = $7 WHERE id = $8`,
+                      [geo.lat, geo.lon, String(geo.lat), encKey, String(geo.lon), encKey, zoneId, subscriberId]
+                    );
                     fastify.log.info(`[webhook] geocoded zip ${zipForGeo} → ${geo.lat},${geo.lon} zone=${zoneId} for ${subscriberId}`);
                   }
                 } catch (geoErr) {
@@ -543,13 +546,13 @@ If you're not interested, you can ignore this email.
 
             // Handle referral reward if ref was provided in checkout metadata
             if (ref) {
-              const referral = await db.prepare(`
+              const { rows: [referral] } = await db.query(`
                 SELECT r.referrer_id, s.stripe_subscription_id
                 FROM referrals r
                 JOIN subscribers s ON r.referrer_id = s.id
-                WHERE r.code = ? AND r.redeemed_at IS NULL
+                WHERE r.code = $1 AND r.redeemed_at IS NULL
                 LIMIT 1
-              `).get(ref);
+              `, [ref]);
 
               if (referral && referral.stripe_subscription_id) {
                 try {
@@ -560,11 +563,11 @@ If you're not interested, you can ignore this email.
                   });
 
                   // Mark referral as redeemed
-                  await db.prepare(`
+                  await db.query(`
                     UPDATE referrals
                     SET redeemed_at = NOW(), reward_applied_at = NOW()
-                    WHERE code = ?
-                  `).run(ref);
+                    WHERE code = $1
+                  `, [ref]);
                 } catch (stripeError) {
                   fastify.log.error('Failed to apply referral reward:', stripeError);
                 }
@@ -580,13 +583,13 @@ If you're not interested, you can ignore this email.
           const customerId = invoice.customer;
 
           // Find subscriber by Stripe customer ID
-          const subscriber = await db.prepare('SELECT id, plan FROM subscribers WHERE stripe_customer_id = ?').get(customerId);
+          const { rows: [subscriber] } = await db.query('SELECT id, plan FROM subscribers WHERE stripe_customer_id = $1', [customerId]);
 
           if (subscriber) {
             const endDate = new Date();
             endDate.setDate(endDate.getDate() + (subscriber.plan === 'annual' ? 365 : subscriber.plan === 'monthly' ? 30 : 7));
 
-            await db.prepare('UPDATE subscribers SET subscription_end_date = ? WHERE id = ?').run(endDate.toISOString().split('T')[0], subscriber.id);
+            await db.query('UPDATE subscribers SET subscription_end_date = $1 WHERE id = $2', [endDate.toISOString().split('T')[0], subscriber.id]);
           }
           break;
         }
@@ -596,7 +599,7 @@ If you're not interested, you can ignore this email.
           const invoice = event.data.object;
           const customerId = invoice.customer;
 
-          await db.prepare('UPDATE subscribers SET subscription_status = ? WHERE stripe_customer_id = ?').run('past_due', customerId);
+          await db.query('UPDATE subscribers SET subscription_status = $1 WHERE stripe_customer_id = $2', ['past_due', customerId]);
           break;
         }
 
@@ -605,13 +608,13 @@ If you're not interested, you can ignore this email.
           const subscription = event.data.object;
           const customerId = subscription.customer;
 
-          await db.prepare(`
+          await db.query(`
             UPDATE subscribers
             SET subscription_status = 'canceled',
                 active = 0,
                 cancelled_at = NOW()
-            WHERE stripe_customer_id = ?
-          `).run(customerId);
+            WHERE stripe_customer_id = $1
+          `, [customerId]);
           break;
         }
 
@@ -637,11 +640,11 @@ If you're not interested, you can ignore this email.
 
     const db = fastify.db;
     try {
-      const subscriber = await db.prepare(`
+      const { rows: [subscriber] } = await db.query(`
         SELECT id FROM subscribers
-        WHERE email_enc = pgp_sym_encrypt(?::text, ?) AND management_token = ?
+        WHERE email_enc = pgp_sym_encrypt($1::text, $2) AND management_token = $3
         LIMIT 1
-      `).get(email, encKey, token);
+      `, [email, encKey, token]);
 
       if (!subscriber) {
         return reply.code(401).send({ error: 'Invalid email or token' });
@@ -650,33 +653,34 @@ If you're not interested, you can ignore this email.
       // Build update query dynamically
       const updates = [];
       const params = [];
-      
+      let paramIndex = 0;
+
       if (author !== undefined) {
-        updates.push('author_key = ?');
+        updates.push(`author_key = $${++paramIndex}`);
         params.push(author);
       }
       if (city !== undefined) {
-        updates.push('location_city_enc = pgp_sym_encrypt(?::text, ?)');
+        updates.push(`location_city_enc = pgp_sym_encrypt($${++paramIndex}::text, $${++paramIndex})`);
         params.push(city, encKey);
       }
       if (state !== undefined) {
-        updates.push('location_state_enc = pgp_sym_encrypt(?::text, ?)');
+        updates.push(`location_state_enc = pgp_sym_encrypt($${++paramIndex}::text, $${++paramIndex})`);
         params.push(state, encKey);
       }
       if (country !== undefined) {
-        updates.push('location_country = ?');
+        updates.push(`location_country = $${++paramIndex}`);
         params.push(country);
       }
       if (zipcode !== undefined) {
-        updates.push('zipcode_enc = pgp_sym_encrypt(?::text, ?)');
+        updates.push(`zipcode_enc = pgp_sym_encrypt($${++paramIndex}::text, $${++paramIndex})`);
         params.push(zipcode, encKey);
       }
 
       if (updates.length > 0) {
         params.push(subscriber.id);
-        await db.prepare(`
-          UPDATE subscribers SET ${updates.join(', ')} WHERE id = ?
-        `).run(...params);
+        await db.query(`
+          UPDATE subscribers SET ${updates.join(', ')} WHERE id = $${++paramIndex}
+        `, params);
       }
 
       return reply.send({ success: true, message: 'Settings updated' });

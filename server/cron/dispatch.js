@@ -275,9 +275,9 @@ async function getAuthorSeasonName(dailyRun, combo, db) {
 
   try {
     // Get season number from micro_season_id
-    const microSeason = await db.prepare(`
-      SELECT season_number FROM micro_seasons WHERE id = ?
-    `).get(dailyRun.micro_season_id);
+    const { rows: [microSeason] } = await db.query(`
+      SELECT season_number FROM micro_seasons WHERE id = $1
+    `, [dailyRun.micro_season_id]);
 
     if (!microSeason) {
       console.warn(`[dispatch] Micro season not found: ${dailyRun.micro_season_id}`);
@@ -376,7 +376,7 @@ function runEngine(combo) {
 
 /**
  * Main dispatch function - run daily
- * @param {object} db - database wrapper (fastify.db or standalone Pool wrapper)
+ * @param {object} db - pg Pool or compatible (must have .query())
  */
 async function runDispatch(db) {
   // If no db passed (standalone mode), create one
@@ -385,25 +385,8 @@ async function runDispatch(db) {
     if (!process.env.DATABASE_URL) {
       throw new Error('DATABASE_URL environment variable is required');
     }
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-    db = {
-      prepare: (sql) => {
-        let paramIndex = 0;
-        const pgSql = sql.replace(/\?/g, () => `$${++paramIndex}`);
-        return {
-          run: (...params) => pool.query(pgSql, params),
-          get: async (...params) => {
-            const result = await pool.query(pgSql, params);
-            return result.rows[0];
-          },
-          all: async (...params) => {
-            const result = await pool.query(pgSql, params);
-            return result.rows;
-          },
-        };
-      },
-      close: () => pool.end(),
-    };
+    db = new Pool({ connectionString: process.env.DATABASE_URL });
+    db._standalonePool = true; // mark so we can close it
   }
 
   const today = getToday();
@@ -411,7 +394,7 @@ async function runDispatch(db) {
 
   try {
     // Get all combinations that have active, confirmed subscribers
-    const combinations = await db.prepare(`
+    const { rows: combinations } = await db.query(`
       SELECT DISTINCT c.*
       FROM combinations c
       INNER JOIN subscribers s ON s.author_key = c.author_key
@@ -421,16 +404,16 @@ async function runDispatch(db) {
            ROUND(s.lon * 20) / 20 = ROUND(c.lon * 20) / 20)
         )
       WHERE s.active = 1 AND s.confirmed_at IS NOT NULL
-    `).all();
+    `);
 
     console.log(`[dispatch] Found ${combinations.length} active combinations`);
 
     for (const combo of combinations) {
       // Check if we already have a run for today
-      const existingRun = await db.prepare(`
+      const { rows: [existingRun] } = await db.query(`
         SELECT id, status FROM daily_runs
-        WHERE combination_id = ? AND run_date = ?
-      `).get(combo.id, today);
+        WHERE combination_id = $1 AND run_date = $2
+      `, [combo.id, today]);
 
       if (existingRun && existingRun.status === 'completed') {
         console.log(`[dispatch] Already completed: ${combo.location_key}/${combo.author_key}`);
@@ -450,54 +433,54 @@ async function runDispatch(db) {
         const runId = existingRun?.id || uuidv4();
 
         if (existingRun) {
-          await db.prepare(`
+          await db.query(`
             UPDATE daily_runs
             SET status = 'completed',
-                prose_text = ?, prose_html = ?, topic = ?, quote = ?,
-                author_name = ?, weather_summary = ?, characters = ?,
-                generated_at = NOW(), generation_ms = ?
-            WHERE id = ?
-          `).run(
+                prose_text = $1, prose_html = $2, topic = $3, quote = $4,
+                author_name = $5, weather_summary = $6, characters = $7,
+                generated_at = NOW(), generation_ms = $8
+            WHERE id = $9
+          `, [
             result.prose_text, result.prose_html, result.topic, result.quote,
             result.author_name, result.weather_summary, result.characters?.join(', '),
             generationMs, runId
-          );
+          ]);
         } else {
-          await db.prepare(`
+          await db.query(`
             INSERT INTO daily_runs (
               id, combination_id, run_date, status,
               prose_text, prose_html, topic, quote,
               author_name, weather_summary, characters,
               generated_at, generation_ms
-            ) VALUES (?, ?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
-          `).run(
+            ) VALUES ($1, $2, $3, 'completed', $4, $5, $6, $7, $8, $9, $10, NOW(), $11)
+          `, [
             runId, combo.id, today,
             result.prose_text, result.prose_html, result.topic, result.quote,
             result.author_name, result.weather_summary, result.characters?.join(', '),
             generationMs
-          );
+          ]);
         }
 
         console.log(`[dispatch] Generated in ${generationMs}ms: ${combo.location_key}/${combo.author_key}`);
 
         // Get subscribers for this combination (lat/lon stay plaintext for geo math)
         const { encKey } = require('../services/db-crypto'); // lazy require: env must be loaded before this runs
-        const subscribers = await db.prepare(`
-          SELECT id, pgp_sym_decrypt(email_enc, ?)::text AS email, unsubscribe_token
+        const { rows: subscribers } = await db.query(`
+          SELECT id, pgp_sym_decrypt(email_enc, $1)::text AS email, unsubscribe_token
           FROM subscribers
-          WHERE author_key = ?
+          WHERE author_key = $2
             AND (
-              (station_code = ? AND station_code IS NOT NULL) OR
-              (ROUND(lat * 20) / 20 = ROUND(?) / 20 AND
-               ROUND(lon * 20) / 20 = ROUND(?) / 20)
+              (station_code = $3 AND station_code IS NOT NULL) OR
+              (ROUND(lat * 20) / 20 = ROUND($4) / 20 AND
+               ROUND(lon * 20) / 20 = ROUND($5) / 20)
             )
             AND active = 1 AND confirmed_at IS NOT NULL
-        `).all(encKey, combo.author_key, combo.station_code, combo.lat, combo.lon);
+        `, [encKey, combo.author_key, combo.station_code, combo.lat, combo.lon]);
 
         console.log(`[dispatch] Sending to ${subscribers.length} subscribers`);
 
         // Get the run for email
-        const dailyRun = await db.prepare('SELECT * FROM daily_runs WHERE id = ?').get(runId);
+        const { rows: [dailyRun] } = await db.query('SELECT * FROM daily_runs WHERE id = $1', [runId]);
 
         // Attach author-voiced season name if available
         const authorSeasonName = await getAuthorSeasonName(dailyRun, combo, db);
@@ -525,20 +508,20 @@ async function runDispatch(db) {
             await sendDailyEmail(sub.email, dailyRun, sub.unsubscribe_token);
 
             // Record delivery
-            await db.prepare(`
+            await db.query(`
               INSERT INTO deliveries (id, daily_run_id, subscriber_id, status, sent_at)
-              VALUES (?, ?, ?, 'sent', NOW())
-            `).run(uuidv4(), runId, sub.id);
+              VALUES ($1, $2, $3, 'sent', NOW())
+            `, [uuidv4(), runId, sub.id]);
 
             console.log(`[dispatch] Sent to ${sub.email}`);
 
           } catch (emailErr) {
             console.error(`[dispatch] Email failed for ${sub.email}:`, emailErr.message);
 
-            await db.prepare(`
+            await db.query(`
               INSERT INTO deliveries (id, daily_run_id, subscriber_id, status, error)
-              VALUES (?, ?, ?, 'failed', ?)
-            `).run(uuidv4(), runId, sub.id, emailErr.message);
+              VALUES ($1, $2, $3, 'failed', $4)
+            `, [uuidv4(), runId, sub.id, emailErr.message]);
           }
         }
 
@@ -547,12 +530,12 @@ async function runDispatch(db) {
 
         // Record failed run
         if (!existingRun) {
-          await db.prepare(`
+          await db.query(`
             INSERT INTO daily_runs (id, combination_id, run_date, status)
-            VALUES (?, ?, ?, 'failed')
-          `).run(uuidv4(), combo.id, today);
+            VALUES ($1, $2, $3, 'failed')
+          `, [uuidv4(), combo.id, today]);
         } else {
-          await db.prepare(`UPDATE daily_runs SET status = 'failed' WHERE id = ?`).run(existingRun.id);
+          await db.query(`UPDATE daily_runs SET status = 'failed' WHERE id = $1`, [existingRun.id]);
         }
       }
     }
@@ -561,6 +544,10 @@ async function runDispatch(db) {
 
   } catch (err) {
     console.error('[dispatch] Fatal error:', err);
+  } finally {
+    if (db._standalonePool) {
+      await db.end();
+    }
   }
 }
 

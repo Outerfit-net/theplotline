@@ -29,26 +29,8 @@ const pool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
-const db = {
-  prepare: (sql) => {
-    // Convert ? placeholders to $1, $2, ... for PostgreSQL
-    let paramIndex = 0;
-    const pgSql = sql.replace(/\?/g, () => `$${++paramIndex}`);
-    return {
-      run: (...params) => pool.query(pgSql, params),
-      get: async (...params) => {
-        const result = await pool.query(pgSql, params);
-        return result.rows[0];
-      },
-      all: async (...params) => {
-        const result = await pool.query(pgSql, params);
-        return result.rows;
-      },
-    };
-  },
-  query: (...args) => pool.query(...args),
-  close: () => pool.end(),
-};
+// db is the pg Pool directly — all callers use db.query() with native $N placeholders
+const db = pool;
 
 const subscriberRoutes = require('./routes/subscribers');
 const authorRoutes = require('./routes/authors');

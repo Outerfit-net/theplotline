@@ -11,12 +11,12 @@ async function authorRoutes(fastify) {
     const db = fastify.db;
 
     try {
-      const authors = await db.prepare(`
+      const { rows: authors } = await db.query(`
         SELECT key, name, style_prompt
         FROM authors
         WHERE active = 1
         ORDER BY name
-      `).all();
+      `);
 
       return reply.send({
         authors: authors.map(a => ({
