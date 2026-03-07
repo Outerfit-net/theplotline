@@ -533,9 +533,9 @@ One row per object. Every input and output explicit. Every group by defined.
 | Title Dict | `(season_bucket, climate_zone_id, condition)` | `title_dict.py` | `{title}` → Masthead |
 | Art | `(condition, season_bucket, season_bucket_description)` | `generate_art.py` (SDXL) | `{png_path}` → Masthead |
 | Masthead | `(png_path, title)` | `generate_masthead.py` (PIL) | `{url}` → Email Template |
-| Dialogue | `(climate_zone_id, sub_region, author_key)` | `{garden_context, author_voice}` | `{prose}` → Email Template |
+| Dialogue | `(date, climate_zone_id, sub_region, author_key)` | `{garden_context, author_voice}` | `{prose}` → Email Template |
 | Unsubscribe Token | `(email_address)` | `subscribers` table | `{unsubscribe_token}` → Email Template |
-| Email Template | `(climate_zone_id, sub_region, author_key)` | `{url, prose, quote, unsubscribe_token}` | `{html}` → Delivery |
+| Email Template | `(date, climate_zone_id, sub_region, author_key)` | `{url, prose, quote, unsubscribe_token}` | `{html}` → Delivery |
 | Delivery | `(email_address)` | `{html}` | `email sent` |
 
 ---
