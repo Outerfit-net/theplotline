@@ -563,3 +563,17 @@ One row per object. Every input and output explicit. Every group by defined.
 | Author voice — haiku pass | Haiku drafts prose from raw dialogue | `{hist, author_style}` | 120s timeout |
 | Author voice — sonnet pass | Sonnet refines to final prose | `{haiku_draft, author_style}` | **800 char hard limit** |
 | Archive write | Full conversation saved to `.md` | `(topic, quote, weather, prose, participants)` | `archive/<station>/<author>/YYYY-MM-DD.md` |
+
+---
+
+## Art Generation
+
+| Step | What Happens | Inputs | Notes |
+|------|-------------|--------|-------|
+| Prompt build | Assemble text prompt | `(condition, season_bucket, season_bucket_description, topic)` | Style from `STYLES_BY_SEASON`, subject from `SUBJECTS_BY_ZONE_SEASON`, first sentence of description as visual cue |
+| Negative prompt | Block unwanted styles | hardcoded | No photos, no people, no 3D, no text |
+| Model load | Load SDXL pipeline once | `stabilityai/stable-diffusion-xl-base-1.0` | `torch.float16`, CUDA, loaded once per batch |
+| Generation | Run diffusion | `(prompt, negative_prompt)` | 30 steps, guidance scale 7.5, native 1024×384 |
+| Resize | Crop to masthead dimensions | `1024×384 → 700×200` | LANCZOS resample |
+| Cache | Save PNG keyed by `(zone, term, condition)` hash | `ART_DIR/sdxl/` | Reused if same combo runs again same day |
+| VRAM cleanup | Unload model, clear cache | — | `del pipe` + `torch.cuda.empty_cache()` after batch |
