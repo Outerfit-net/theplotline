@@ -493,3 +493,55 @@ After dialogue completes, `write_archive()` writes a single `.md` file with:
 - **No per-character memory** — every character gets the same full archive. Should be filtered to conversations that character actually participated in.
 - **`read_character_memory` loads full prose** — at 7 days this can be 10K+ tokens per character before the conversation even starts. Needs a cap or summarization step.
 - **Archive path uses `afd_station`** — should use `(station_code, author_key)` to match master query grain.
+
+---
+
+## Object Model (Pipeline Stages)
+
+One row per object. Every input and output explicit. Every group by defined.
+
+| Stage | Group By | Output |
+|-------|----------|--------|
+| Weather | `(station_code, zipcode)` | `{condition}` → Art, Title Dict, `{forecast}` → Dialogue |
+| Solar Term | `(climate_zone_id, zone_offset)` | `{season_bucket, season_bucket_description}` → Art, Topic, Dialogue |
+| Sub-region | `(station_code, climate_zone_id)` | `{sub_region_description}` → Dialogue |
+| Topic ⚠️ TODO: generate 14 per `(season_bucket, climate_zone_id)` | `(season_bucket, climate_zone_id)` | `{topic}` → Dialogue |
+| Quote ⚠️ TODO: `garden-quotes.py`, 14 per `season_bucket` | `(season_bucket)` | `{quote}` → Dialogue, Delivery |
+| Title Dict ⚠️ TODO: pre-generate per group by | `(season_bucket, climate_zone_id, condition)` | `{title}` → Masthead |
+| Art | `({condition, season_bucket, season_bucket_description})` | `{png_path}` → Masthead |
+| Masthead | `({png_path, title})` | `{url}` → Delivery |
+| Author Voice | `(author_key)` | `{style_prompt}` → Dialogue |
+| Dialogue | `(author_key, {forecast, season_bucket_description, sub_region_description, topic, quote, style_prompt, character_souls})` | `{prose}` → Delivery |
+| Unsubscribe Token | `(email_address)` | `{unsubscribe_token}` → Email Template |
+| Email Template | `({url, prose, quote, unsubscribe_token})` | `{html}` → Delivery |
+| Delivery | `(email_address, {html})` | `email sent` |
+
+---
+
+## Script / File → Object Mapping
+
+| Script / File | Object | Group By |
+|---------------|--------|----------|
+| `garden-weather.py` | Weather | `(station_code, zipcode)` |
+| `garden_seasons.py: SOLAR_TERMS` | Solar Term + `season_bucket_description` | `(climate_zone_id, zone_offset)` |
+| `garden_seasons.py: ZONE_OFFSETS` | Zone offsets (28 zones) | `(climate_zone_id)` |
+| `garden_seasons.py: SUB_REGION_ZONES` | Sub-region → zone mapping (~100 regions) | `(sub_region_id)` |
+| `server/services/sub-regions.js` | Sub-region description | `(station_code, climate_zone_id)` |
+| `topic_bank_24.py` ⚠️ TODO | Topic | `(season_bucket, climate_zone_id)` |
+| `garden-quotes.py` ⚠️ TODO: doesn't exist | Quote | `(season_bucket)` |
+| `generate_art.py` | Art | `({condition, season_bucket, season_bucket_description})` |
+| `generate_masthead.py` | Masthead | `({png_path, title})` |
+| `title_dict.py` ⚠️ TODO: doesn't exist | Title Dict | `(season_bucket, climate_zone_id, condition)` |
+| `authors.json` | Author Voice (15 voices) | `(author_key)` |
+| `persona-*.md` (12 files) | Character Souls | `(character_key)` |
+| `garden-context-cache.json` | Garden context description | `(station_code)` |
+| `archive/<station>/<author>/YYYY-MM-DD.md` | Dialogue history | `(station_code, author_key, date)` |
+| `garden-dialogue.py` | Dialogue | `(author_key, {forecast, season_bucket_description, sub_region_description, topic, quote, style_prompt, character_souls})` |
+| `garden-assembler.py` | Email Template | `({url, prose, quote, unsubscribe_token})` |
+| `garden-mailer.py` | Delivery | `(email_address, {html})` |
+| `garden-dispatch.py` | Orchestrator | all objects |
+| `DB: climate_zones` | 28 zone ids + names | `(climate_zone_id)` |
+| `DB: combinations` | Station + author + lat/lon + zone | `(station_code, author_key)` |
+| `DB: subscribers` | All subscriber data (encrypted) | `(email_address)` |
+| `DB: daily_runs` | Per-run output record | `(combination_id, run_date)` |
+| `DB: deliveries` | Per-subscriber send record | `(subscriber_id, daily_run_id)` |
