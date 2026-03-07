@@ -582,3 +582,20 @@ One row per object. Every input and output explicit. Every group by defined.
 | Resize | Crop to masthead dimensions | `1024×384 → 700×200` | LANCZOS resample |
 | Cache | Save PNG | `(zone, term_id, condition)` hash | `ART_DIR/generated/` — model-agnostic |
 | VRAM cleanup | Unload model | — | `del pipe` + `torch.cuda.empty_cache()` |
+
+---
+
+## Operational Directories
+
+Working directories used to pass objects between pipeline scripts.
+
+| Directory | Path | Contents | Passed Between |
+|-----------|------|----------|----------------|
+| Run dir | `/opt/plotlines/data/runs/YYYY-MM-DD/` | All per-run working files | dispatch → all scripts |
+| Weather cache | `runs/YYYY-MM-DD/weather_<station>.json` | `{condition, forecast, weather_report}` | dispatch → dialogue, art |
+| Subscriber files | `runs/YYYY-MM-DD/subscribers_<station>_<author>.json` | `[{email, unsubscribe_token}]` | dispatch → mailer |
+| Dialogue cache | `runs/YYYY-MM-DD/dialogue_<station>_<author>.json` | `{prose, topic, quote, characters}` | dispatch → assembler |
+| Prose cache | `/opt/plotlines/data/prose-cache/YYYY-MM-DD/` | Author voice refined prose | dispatch → assembler |
+| Art cache | `/opt/plotlines/data/mastheads/art/generated/` | PNG keyed by `(zone, term_id, condition)` hash | generate_art → masthead |
+| Masthead output | `/opt/plotlines/data/mastheads/` | Final composited PNG, served via `/mastheads/*` | generate_masthead → assembler → email |
+| Archive | `skills/garden-conversation/archive/<station>/<author>/YYYY-MM-DD.md` | Full conversation history | dialogue → next day's dialogue |
