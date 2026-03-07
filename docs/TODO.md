@@ -21,13 +21,34 @@
 ### C5. Node.js server routes still use `?` placeholder shim
 **File:** `server/routes/subscribers.js`, `server/routes/stripe.js`, all routes
 **Issue:** `index.js` has a shim converting `?` → `$1,$2` for Postgres. Works but fragile — any `?` in a string value breaks it. Migrate to native `$1` syntax.
-**Status:** ⬜ TODO
+**Status:** 🔄 IN PROGRESS — agent running (session tidal-haven)
 
 ### C6. `fallback-prose.py` — purpose unknown
 **Status:** ✅ DONE — commit `b7696ae` — confirmed dead, deleted
 
 ### C7. Dead scripts — delete or archive
 **Status:** ✅ DONE — commit `b7696ae` — deleted garden-daily-v2/v3, garden-daily-single-email, fallback-prose
+
+### C8. `_run_dialogue` zone/hemisphere as free variables (was)
+**Status:** ✅ DONE — commit `f776831` — fixed: now explicit params
+
+### C9. `garden_context` not zone-aware — always fetched for `(city, state, location_key)` only
+**File:** `garden-dialogue.py: fetch_garden_context()`
+**Issue:** Context is cached by `location_key` only. Two subscribers in same city but different zones would share context. Minor — but the context prompt also has no zone-specific language injected.
+**Fix:** Cache key should include `climate_zone_id`; prompt should include zone-specific context
+**Status:** ⬜ TODO (low priority)
+
+### C10. Prose cache keyed by `(today, author, zone)` — not `(station_code, author, zone)`
+**File:** `garden-dialogue.py: cache_path(today, author, zone)`
+**Issue:** Two stations in the same zone + same author would share a prose cache entry. `BOU/hemingway/high_plains` and a hypothetical `DEN/hemingway/high_plains` would collide.
+**Fix:** Add `station_code` to cache key: `f"{author}_{station}_{zone}.json"`
+**Status:** ⬜ TODO (low priority — currently only 1 station per zone in practice)
+
+### C11. `season_bucket` passed to `get_newsletter_title()` but not `climate_zone_id`
+**File:** `garden-dispatch.py: get_newsletter_title()` call at masthead step
+**Issue:** Title generation doesn't know the zone — can't generate zone-specific titles until title_dict is wired. After P3 is done, update the call to pass `climate_zone_id` too.
+**Fix:** Pass `zone` to `get_newsletter_title()` and on to `get_title()` once P3 is wired
+**Status:** ⬜ TODO (blocked on P3)
 
 ---
 
