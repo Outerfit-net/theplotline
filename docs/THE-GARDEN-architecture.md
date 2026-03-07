@@ -686,7 +686,7 @@ flowchart TD
     AUTH["authors.json\n(author_key)\n→ {author_voice}"]
     CHARS["persona-*.md\n(character_key)\n→ {character_souls}"]
     PROSE_CACHE[("prose cache\ndate, climate_zone_id\nsub_region, author_key\nlast 7 days")]
-    TITLEDICT["title_dict\n(season_bucket=sekki_name, climate_zone_id, condition)\nDB cache — self-populates\nevery ~14 days per zone\n→ {title}"]
+    TITLEDICT["title_dict\n(season_bucket=sekki_name, climate_zone_id, condition)\nDB cache — self-populates on miss\nbatch: all 7 conditions at once via Haiku\n→ {title}"]
     ART["generate_art.py\n(condition, season_bucket\nseason_bucket_description)\nSDXL, 30 steps\n→ {png_path}"]
 
     SUBR -->|sub_region_description| GARDENCTX

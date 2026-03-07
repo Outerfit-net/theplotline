@@ -72,7 +72,7 @@
 **Spec:** Pre-generate titles per `(season_bucket=sekki_name, climate_zone_id, condition)` = up to 4,704 titles (24 sekki × 28 zones × 7 conditions)
 **Issue:** Was generated per-run via mistral with 30s timeout — slow and inconsistent
 **Storage:** `title_dict` DB table, look up at dispatch time
-**Status:** ✅ DONE — `title_dict.py` exists, wired into `garden-dispatch.py` via `get_or_create_title(sekki_name, climate_zone_id, condition)`; self-populates on miss (generates all 7 conditions at once via phi4); grain corrected to sekki name not coarse bucket.
+**Status:** ✅ DONE — `title_dict.py` wired into `garden-dispatch.py` via `get_or_create_title(sekki_name, climate_zone_id, condition)`; on miss generates all 7 conditions in one batch prompt via Claude Haiku (openclaw agent — no API key needed); grain is sekki name × 28 zones × 7 conditions = 4,704. Prompt uses XML tags (`<instructions>`, `<context>`, `<priority>`) with zone+condition in `<priority>` for differentiation. Publication types drawn from 50-item historical list.
 
 ### P4. DB tables for P1/P2/P3
 **Tables needed:**
