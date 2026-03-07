@@ -77,11 +77,11 @@
 
 ### P4. DB tables for P1/P2/P3
 **Tables needed:**
-- `topics (id, text, season_bucket, climate_zone_id, used_date)`
-- `quotes (id, text, attribution, season_bucket)`
-- `quote_usage (quote_id, run_date)`
-- `title_dict (id, title, season_bucket, climate_zone_id, condition)`
-**Status:** ✅ PARTIAL — `quote_usage` ✅, `title_dict` ✅ (18 rows). `topics` table and `quotes` table not yet in DB — quotes live in QUOTE_BANK_336 dict in garden_quotes.py (in-memory, not DB).
+- `quote_usage (quote_id, station_code, run_date)` — non-repeat tracking for quotes
+- `title_dict (id, title, season_bucket, climate_zone_id, condition)` — cached titles
+- `topics (id, text, season_bucket, climate_zone_id, used_date)` — for topic non-repeat tracking
+**Note:** `quotes` table not needed — 336 quotes live in-memory in `garden_quotes.py`; `quote_usage` handles non-repeat correctly (14-day window per station). Topics have NO non-repeat tracking at all — same topic can repeat daily.
+**Status:** ✅ PARTIAL — `quote_usage` ✅ (non-repeat working), `title_dict` ✅ (18 rows seeded). `topics` table ❌ missing — topic repeat tracking not implemented.
 
 ---
 
