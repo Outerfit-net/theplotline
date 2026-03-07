@@ -4,6 +4,7 @@
 
 | Resource | Path |
 |---|---|
+| Resolve email | `/home/administrator/openclaw/skills/garden-conversation/resolve_email.py` |
 | Dispatch script | `/home/administrator/openclaw/skills/garden-conversation/garden-dispatch.py` |
 | Dialogue script | `/home/administrator/openclaw/skills/garden-conversation/garden-dialogue.py` |
 | Art script | `/home/administrator/openclaw/skills/garden-conversation/generate_art.py` |

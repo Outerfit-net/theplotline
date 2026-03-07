@@ -20,10 +20,21 @@ Run any pipeline stage on demand. Show ALL raw output — never summarize, never
 
 ```bash
 DISPATCH=/home/administrator/openclaw/skills/garden-conversation/garden-dispatch.py
+RESOLVE=/home/administrator/openclaw/skills/garden-conversation/resolve_email.py
 DATE=$(TZ=America/Denver date +%Y-%m-%d)   # override with --date if needed
 ```
 
-Resolve email → combo via `--email EMAIL` flag (dispatch looks up via email_hash).
+**Always resolve the email first** before running any stage:
+
+```bash
+python3 $RESOLVE EMAIL --date $DATE
+```
+
+This returns full grain: `station_code`, `author_key`, `climate_zone_id`, `hemisphere`, `lat`, `lon`, `season_bucket` (offset-adjusted sekki name), `season_bucket_description`, `weather_condition`, `title_dict_key`.
+
+Show the full resolution output to the user — this is the first verification step. If anything looks wrong (wrong zone, wrong sekki, wrong condition), stop and investigate before running any stage.
+
+All `--email EMAIL` flags in dispatch resolve via `email_hash` internally — same lookup.
 
 ## Commands
 
