@@ -57,7 +57,7 @@ It is absurdist. It is horticultural. It is oddly wise.
 | Process manager | PM2 | — | Cluster mode |
 | Frontend | React + Vite + Tailwind | 18.2 / 5.1 / 4.0 | Built to `/opt/plotlines/client/dist` |
 | Python | Python | 3.10.12 | Pipeline scripts |
-| Art generation | Stable Diffusion 1.5 | diffusers 0.36.0 | torch 2.10.0, RTX 4000 |
+| Art generation | Stable Diffusion XL (SDXL) | diffusers 0.36.0 | torch 2.10.0, RTX 4000 |
 | LLM (dialogue) | mistral:latest | — | Ollama local |
 | LLM (title) | mistral:latest | — | Ollama local, 30s timeout |
 | LLM (other) | gemma2, granite3.3, phi4:14b, qwen3.5 | — | Ollama local, character rotation |
