@@ -185,3 +185,12 @@ Tests we need that don't exist:
 - [x] Architecture doc: complete rewrite with object model, DAG diagrams, all tables
 - [x] Webhook backfill: split zip/geo logic, subscriber zip preferred
 - [x] florida_keys wet season: "Hurricane Season" → "Wet Season"
+
+---
+
+### A1. Art prompt — wrong grain and bad sekki cue
+**Issue:** Two problems with `generate_art.py` `build_prompt()`:
+1. **Zone subjects use coarse season bucket** (`spring/summer/fall/winter`) not sekki — `high_plains/spring` always gives `crocus shoots, bare soil, frost-touched grass` regardless of which of the 6 spring sekki we're in. Should use sekki name or description to drive subject.
+2. **Sekki cue = first sentence of description only** (`split(".")[0]`) — for Awakening of Insects this is `"Turn over a clod of earth and you'll find them: pale worms, a beetle tucking back into the dark"` which caused SDXL to paint a cockroach. Should use a garden-focused extract from the full description, not the opening sentence verbatim.
+**Fix:** Replace `SUBJECTS_BY_ZONE_SEASON` lookup with sekki-aware subjects; replace `term_cue = term["description"].split(".")[0]` with a curated garden-focused phrase derived from the full description.
+**Status:** ⬜ TODO
