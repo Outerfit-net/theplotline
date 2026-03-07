@@ -527,7 +527,7 @@ One row per object. Every input and output explicit. Every group by defined.
 | Topic | `(season_bucket, climate_zone_id)` | `topic_bank_24.py` | `{topic}` → Garden Context |
 | Quote | `(season_bucket)` | `garden_quotes.py` | `{quote}` → Garden Context, Delivery |
 | Character Souls | `(character_key)` | `persona-*.md` | `{character_souls}` → Garden Context |
-| History | `(station_code, author_key, date)` | `archive/` + `daily_runs` | `{history}` → Garden Context |
+| History | `(climate_zone_id, author_key)` | `archive/` + `daily_runs` | `{history}` → Garden Context |
 | Author Voice | `(author_key)` | `authors.json` | `{author_voice}` → Dialogue |
 | Garden Context | `(season_bucket, condition)` | `{forecast, season_bucket_description, sub_region_description, topic, quote, character_souls, history}` | `{garden_context}` → Dialogue |
 | Title Dict | `(season_bucket, climate_zone_id, condition)` | `title_dict.py` | `{title}` → Masthead |
@@ -558,7 +558,7 @@ One row per object. Every input and output explicit. Every group by defined.
 | `authors.json` | Author Voice (15 voices) | `(author_key)` |
 | `persona-*.md` (12 files) | Character Souls | `(character_key)` |
 | `garden-context-cache.json` | Garden Context | `(season_bucket, condition)` |
-| `archive/<station>/<author>/YYYY-MM-DD.md` + `daily_runs` | History | `(station_code, author_key, date)` |
+| `archive/<station>/<author>/YYYY-MM-DD.md` + `daily_runs` | History | `(climate_zone_id, author_key)` |
 | `garden-dialogue.py` | Garden Context + Dialogue | `(climate_zone_id, author_key)` |
 | `garden-assembler.py` | Email Template | `({url, prose, quote, unsubscribe_token})` |
 | `garden-mailer.py` | Delivery | `(email_address, {html})` |
