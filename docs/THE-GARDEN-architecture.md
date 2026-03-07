@@ -888,3 +888,41 @@ OUT: {
 ```
 Script: `garden-mailer.py`
 Known gap: D1 — reports sent=N even in dry run mode
+
+## Future Refinement — Structured AFD JSON
+
+Currently `afd_summary` is a markdown blob passed as-is into dialogue prompts. Future refinement: parse it into structured JSON so downstream modules can use it programmatically.
+
+Proposed schema:
+```json
+{
+  "frost_risk": false,
+  "watering_needed": true,
+  "best_days": ["Sunday", "Monday"],
+  "daily": [
+    {
+      "day": "Today",
+      "summary": "Dry and quiet, highs upper 40s to lower 50s",
+      "temp_high_f": 50,
+      "gardening_note": "decent day for light yard work"
+    },
+    {
+      "day": "Sunday",
+      "summary": "Best gardening window, upper 50s to mid 60s",
+      "temp_high_f": 62,
+      "gardening_note": "best gardening stretch of the week"
+    }
+  ],
+  "period_start": "2026-03-07",
+  "period_end": "2026-03-11",
+  "notes": "Unseasonably warm for early March. No frost through period."
+}
+```
+
+Benefits:
+- `frost_risk` → drives whether frost condition bucket is forced regardless of current obs
+- `best_days` → dialogue characters can reference the upcoming window specifically
+- `watering_needed` → art prompt and dialogue can reference dry conditions
+- `daily` → richer weather context per day, not just a blob
+
+Implementation: add `parse_afd_to_json()` to `garden-weather.py`, called after `summarize_afd_for_gardeners()`. Output stored as `afd_json` field in weather cache file. Update weather module interface contract accordingly.
