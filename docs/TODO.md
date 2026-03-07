@@ -97,7 +97,7 @@
 
 ## 🟢 TESTS — Review & Expand
 
-### T1. Full test suite review
+### T1. Full test suite review (ongoing — add as gaps found)
 **Task:** Review every test in `server/__tests__/` and `test_pipeline.py` against the approved architecture.
 - Does each test test what we've decided is true?
 - Are group bys correct?
@@ -106,15 +106,8 @@
 **Status:** ⬜ TODO
 
 ### T2. Add missing Node.js tests
-Tests we need that don't exist:
-- Signup flow end-to-end: form → geocode → zone → DB insert
-- Duplicate email handling (active sub blocked, inactive reactivated)
-- Confirmation email flow: confirm_token → confirmed_at set
-- Cancel flow: unsubscribe_token → active=0
-- Reactivation flow: cancelled subscriber can resubscribe
-- Stripe referral: referee payment → referrer gets free month
-- Zone assignment: verify `assignClimateZone` returns correct zone for all 28 zone boundaries
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit `8225aef` — signup-flow.test.js (6 tests) + master-query.test.js (5 tests); 193 passing total
+**Remaining:** Stripe referral test (blocked on P2/P3 completion)
 
 ### T3. Add missing Python pipeline tests
 Tests we need that don't exist:
