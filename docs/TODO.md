@@ -42,7 +42,7 @@
 **File:** `garden-dialogue.py: cache_path(today, author, zone)`
 **Issue:** Two stations in the same zone + same author would share a prose cache entry. `BOU/hemingway/high_plains` and a hypothetical `DEN/hemingway/high_plains` would collide.
 **Fix:** Add `station_code` to cache key: `f"{author}_{station}_{zone}.json"`
-**Status:** ⬜ TODO (low priority — currently only 1 station per zone in practice)
+**Status:** ✅ DONE — commit `70f999e` — cache key is now `(date, climate_zone_id, sub_region, author_key)`; station_code dropped (not part of dialogue grain); sub_region added (nullable, stored as 'none')
 
 ### C11. `season_bucket` passed to `get_newsletter_title()` but not `climate_zone_id`
 **File:** `garden-dispatch.py: get_newsletter_title()` call at masthead step
