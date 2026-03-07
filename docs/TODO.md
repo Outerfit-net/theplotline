@@ -69,11 +69,10 @@
 **Status:** ✅ DONE — `garden_quotes.py` exists with 336 quotes, wired into `garden-dialogue.py` via `from garden_quotes import get_quote`; QUOTE_BANK removed from dialogue; `quote_usage` table in Postgres
 
 ### P3. Title Dict — `title_dict.py`
-**Spec:** Pre-generate titles per `(season_bucket, climate_zone_id, condition)` = up to 1,176 titles (6 season_buckets × 28 zones × 7 conditions)
+**Spec:** Pre-generate titles per `(season_bucket=sekki_name, climate_zone_id, condition)` = up to 4,704 titles (24 sekki × 28 zones × 7 conditions)
 **Issue:** Was generated per-run via mistral with 30s timeout — slow and inconsistent
 **Storage:** `title_dict` DB table, look up at dispatch time
-**Status:** ✅ DONE — `title_dict.py` exists, wired into `garden-dispatch.py` via `from title_dict import get_title`; `title_dict` table in Postgres (18 rows seeded so far — not fully populated)
-**Note:** Table only has 18 rows — not all combos pre-generated yet. Falls back to generate_title.py when no match. Full population is future work (P1b-style sweep).
+**Status:** ✅ DONE — `title_dict.py` exists, wired into `garden-dispatch.py` via `get_or_create_title(sekki_name, climate_zone_id, condition)`; self-populates on miss (generates all 7 conditions at once via phi4); grain corrected to sekki name not coarse bucket.
 
 ### P4. DB tables for P1/P2/P3
 **Tables needed:**

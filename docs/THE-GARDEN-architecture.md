@@ -329,7 +329,7 @@ ORDER BY
 
 **Quote Module (`garden-quotes.py`)** — 24 terms × 14 quotes = 336 quotes. Interface: `get_quote(season_bucket, run_date)`. Non-repeat: cycle all 14 before repeating. Store in `quotes` table with `quote_usage` tracking.
 
-**Title Dict** — Pre-generate titles per `(season_bucket, climate_zone_id, condition)` = 24 × 28 × 6 = 4,032 titles. Currently generated per-run via mistral (slow, inconsistent). Store in DB, look up at dispatch time.
+**Title Dict** — Pre-generate titles per `(season_bucket=sekki_name, climate_zone_id, condition)` = 24 × 28 × 7 = 4,704 titles. Self-populates on miss — generates all 7 conditions at once via phi4. Stored in `title_dict` DB table, looked up at dispatch time.
 
 ---
 
@@ -437,7 +437,7 @@ All static lookup data used by the pipeline.
 | `DB: combinations` | location_key + author_key + lat/lon + station_code + zone | `garden-dispatch.py` |
 | `DB: quotes` ⚠️ TODO | 336 quotes keyed by season_bucket (14 per term) | `garden-quotes.py` (TODO) |
 | `DB: quote_usage` ⚠️ TODO | Tracks quote usage per run_date for non-repeat logic | `garden-quotes.py` (TODO) |
-| `DB: title_dict` ⚠️ TODO | Pre-generated titles per (season_bucket, climate_zone_id, condition) | `title_dict.py` (TODO) |
+| `DB: title_dict` | Pre-generated titles per (season_bucket=sekki_name, climate_zone_id, condition) | `title_dict.py` |
 | `solar-terms.md` / `SEKKI.md` | Reference docs for 24 solar terms | Documentation only |
 | `garden-context-cache.json` | Cached garden context descriptions per location | `garden-dialogue.py` |
 
@@ -455,7 +455,7 @@ All static lookup data used by the pipeline.
 | `garden-quotes.py` ⚠️ TODO: doesn't exist | Quote | `(season_bucket)` | `{quote}` |
 | `generate_art.py` | Art | `({condition, season_bucket, season_bucket_description})` | `{png_path}` |
 | `generate_masthead.py` | Masthead | `({png_path, title})` | `{url}` |
-| `title_dict.py` ⚠️ TODO: doesn't exist | Title Dict | `(season_bucket, climate_zone_id, condition)` | `{title}` |
+| `title_dict.py` | Title Dict | `(season_bucket=sekki_name, climate_zone_id, condition)` | `{title}` |
 | `authors.json` | Author Voice | `(author_key)` | `{author_voice}` |
 | `persona-*.md` | Character Souls | `(character_key)` | `{character_soul}` |
 | `garden-dialogue.py` | Dialogue | `(author_key, {forecast, season_bucket_description, sub_region_description, topic, quote, author_voice, character_souls})` | `{prose}` |
@@ -529,7 +529,7 @@ One row per object. Every input and output explicit. Every group by defined.
 | Character Souls | `(character_key)` | `persona-*.md` | `{character_souls}` → Garden Context |
 | Author Voice | `(author_key)` | `authors.json` | `{author_voice}` → Dialogue |
 | Garden Context | `(climate_zone_id, sub_region, season_bucket, condition)` | `{season_bucket_description, sub_region_description, condition}` | `{garden_context}` → Dialogue |
-| Title Dict | `(season_bucket, climate_zone_id, condition)` | `title_dict.py` | `{title}` → Masthead |
+| Title Dict | `(season_bucket=sekki_name, climate_zone_id, condition)` | `title_dict.py` | `{title}` → Masthead |
 | Art | `(condition, season_bucket, season_bucket_description)` | `generate_art.py` (SDXL) | `{png_path}` → Masthead |
 | Masthead | `(png_path, title)` | `generate_masthead.py` (PIL) | `{url}` → Email Template |
 | Dialogue | `(date, climate_zone_id, sub_region, author_key)` | `{garden_context, author_voice}` | `{prose}` → Prose |
@@ -554,7 +554,7 @@ One row per object. Every input and output explicit. Every group by defined.
 | `garden-quotes.py` ⚠️ TODO: doesn't exist | Quote | `(season_bucket)` |
 | `generate_art.py` | Art | `({condition, season_bucket, season_bucket_description})` |
 | `generate_masthead.py` | Masthead | `({png_path, title})` |
-| `title_dict.py` ⚠️ TODO: doesn't exist | Title Dict | `(season_bucket, climate_zone_id, condition)` |
+| `title_dict.py` | Title Dict | `(season_bucket=sekki_name, climate_zone_id, condition)` |
 | `authors.json` | Author Voice (15 voices) | `(author_key)` |
 | `persona-*.md` (12 files) | Character Souls | `(character_key)` |
 | `garden-context-cache.json` | Garden Context | `(season_bucket, condition)` |
@@ -686,7 +686,7 @@ flowchart TD
     AUTH["authors.json\n(author_key)\n→ {author_voice}"]
     CHARS["persona-*.md\n(character_key)\n→ {character_souls}"]
     PROSE_CACHE[("prose cache\ndate, climate_zone_id\nsub_region, author_key\nlast 7 days")]
-    TITLEDICT["title_dict\n(season_bucket, climate_zone_id, condition)\nDB cache — self-populates\nevery ~14 days per zone\n→ {title}"]
+    TITLEDICT["title_dict\n(season_bucket=sekki_name, climate_zone_id, condition)\nDB cache — self-populates\nevery ~14 days per zone\n→ {title}"]
     ART["generate_art.py\n(condition, season_bucket\nseason_bucket_description)\nSDXL, 30 steps\n→ {png_path}"]
 
     SUBR -->|sub_region_description| GARDENCTX
