@@ -25,16 +25,16 @@ describe('Geocoding: Location validation', () => {
 
   /**
    * Juneau, AK coordinates: lat 58.3020, lon -134.4197
-   * Should be in alaska zone
+   * Should be in alaska_south_coastal zone
    */
-  test('Juneau, AK (58.3020, -134.4197) → alaska', () => {
+  test('Juneau, AK (58.3020, -134.4197) → alaska_south_coastal', () => {
     const lat = 58.3020;
     const lon = -134.4197;
     const zone = assignClimateZone(lat, lon, 'US');
     
     expect(zone).toBe('alaska_south_coastal');
     
-    // Verify reasoning: lat >= 54 → alaska (catches all of AK including Southeast)
+    // Verify reasoning: lat >= 54 → alaska_south_coastal (catches Southeast AK) or alaska_interior
     expect(lat >= 54).toBe(true);
   });
 
@@ -107,12 +107,12 @@ describe('Geocoding: Location validation', () => {
   });
 
   /**
-   * Verify zone rule precedence: alaska comes before pacific_maritime
+   * Verify zone rule precedence: alaska_south_coastal comes before pacific_maritime
    * even though Juneau technically matches both criteria
    */
   test('Zone rule precedence: alaska > pacific_maritime', () => {
     // Juneau satisfies both:
-    // - lat >= 54 (alaska)
+    // - lat >= 54 (alaska_south_coastal)
     // - lon <= -116 AND lat >= 37 AND lat <= 50 (pacific_maritime would require lat <= 50, fails)
     // Actually pacific_maritime is: lon <= -116 && lat >= 37 && lat <= 50
     // Juneau: lat = 58.3, which is > 50, so it doesn't match pacific_maritime anyway
