@@ -272,8 +272,9 @@ ORDER BY
 
 | Stage | Group By | Output |
 |-------|----------|--------|
+| Zone Assignment | `(lat, lon, country)` | `{climate_zone_id, hemisphere}` → stored on subscriber at signup, drives all downstream lookups |
 | Weather | `(station_code, zipcode)` | `{condition}` → Art, Title Dict, `{forecast}` → Dialogue |
-| Solar Term | `(climate_zone_id, zone_offset)` | `{season_bucket, season_bucket_description}` → Art, Topic, Dialogue |
+| Solar Term | `(climate_zone_id, hemisphere)` | `{season_bucket, season_bucket_description}` → Art, Topic, Dialogue |
 | Sub-region | `(station_code, climate_zone_id)` | `{sub_region_description}` → Dialogue |
 | Topic ⚠️ TODO: generate 14 per `(season_bucket, climate_zone_id)` | `(season_bucket, climate_zone_id)` | `{topic}` → Dialogue |
 | Quote ⚠️ TODO: `garden-quotes.py`, 14 per `season_bucket` | `(season_bucket)` | `{quote}` → Dialogue, Delivery |
@@ -430,8 +431,9 @@ All static lookup data used by the pipeline.
 
 | Script | Stage | Inputs | Outputs |
 |--------|-------|--------|---------|
+| `server/services/climate.js: assignClimateZone()` | Zone Assignment | `(lat, lon, country)` | `{climate_zone_id, hemisphere}` — runs at signup only |
 | `garden-weather.py` | Weather | `(station_code, zipcode)` | `{condition, forecast}` |
-| `garden_seasons.py` | Solar Term | `(climate_zone_id, zone_offset)` | `{season_bucket, season_bucket_description}` |
+| `garden_seasons.py` | Solar Term | `(climate_zone_id, hemisphere)` | `{season_bucket, season_bucket_description}` |
 | `server/services/sub-regions.js` | Sub-region | `(station_code, climate_zone_id)` | `{sub_region_description}` |
 | `topic_bank_24.py` ⚠️ TODO | Topic | `(season_bucket, climate_zone_id)` | `{topic}` |
 | `garden-quotes.py` ⚠️ TODO: doesn't exist | Quote | `(season_bucket)` | `{quote}` |
@@ -502,8 +504,9 @@ One row per object. Every input and output explicit. Every group by defined.
 
 | Stage | Group By | Output |
 |-------|----------|--------|
+| Zone Assignment | `(lat, lon, country)` | `{climate_zone_id, hemisphere}` → stored on subscriber at signup, drives all downstream lookups |
 | Weather | `(station_code, zipcode)` | `{condition}` → Art, Title Dict, `{forecast}` → Dialogue |
-| Solar Term | `(climate_zone_id, zone_offset)` | `{season_bucket, season_bucket_description}` → Art, Topic, Dialogue |
+| Solar Term | `(climate_zone_id, hemisphere)` | `{season_bucket, season_bucket_description}` → Art, Topic, Dialogue |
 | Sub-region | `(station_code, climate_zone_id)` | `{sub_region_description}` → Dialogue |
 | Topic ⚠️ TODO: generate 14 per `(season_bucket, climate_zone_id)` | `(season_bucket, climate_zone_id)` | `{topic}` → Dialogue |
 | Quote ⚠️ TODO: `garden-quotes.py`, 14 per `season_bucket` | `(season_bucket)` | `{quote}` → Dialogue, Delivery |
@@ -522,8 +525,9 @@ One row per object. Every input and output explicit. Every group by defined.
 
 | Script / File | Object | Group By |
 |---------------|--------|----------|
+| `server/services/climate.js: assignClimateZone()` | Zone Assignment | `(lat, lon, country)` | `{climate_zone_id, hemisphere}` — runs at signup only |
 | `garden-weather.py` | Weather | `(station_code, zipcode)` |
-| `garden_seasons.py: SOLAR_TERMS` | Solar Term + `season_bucket_description` | `(climate_zone_id, zone_offset)` |
+| `garden_seasons.py: SOLAR_TERMS` | Solar Term + `season_bucket_description` | `(climate_zone_id, hemisphere)` |
 | `garden_seasons.py: ZONE_OFFSETS` | Zone offsets (28 zones) | `(climate_zone_id)` |
 | `garden_seasons.py: SUB_REGION_ZONES` | Sub-region → zone mapping (~100 regions) | `(sub_region_id)` |
 | `server/services/sub-regions.js` | Sub-region description | `(station_code, climate_zone_id)` |
