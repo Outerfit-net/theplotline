@@ -1,5 +1,5 @@
 # Plot Lines — TODO
-*Last Updated: 2026-03-06 (C5 marked done)*
+*Last Updated: 2026-03-07*
 *Keep this in sync with THE-GARDEN-architecture.md. When a TODO is done, mark it ✅ and note the commit.*
 
 ---
@@ -123,7 +123,7 @@
 - Are group bys correct?
 - Are zone names current (28 zones, no old names)?
 - Are encrypted field assertions using correct column names (`email_enc` not `email`)?
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit `06b2168` — only issue found: stale `alaska` zone name in geocode-validation.test.js *comments* (not assertions). Fixed. All assertions already correct.
 
 ### T2. Add missing Node.js tests
 **Status:** ✅ DONE — commit `8225aef` — signup-flow.test.js (6 tests) + master-query.test.js (5 tests); 193 passing total
@@ -131,19 +131,19 @@
 
 ### T3. Add missing Python pipeline tests
 Tests we need that don't exist:
-- Master query returns correct GROUP BY grain `(station_code, zipcode, author_key, climate_zone_id, hemisphere)`
-- `JSON_AGG(subscribers)` contains correct fields per combo
-- Solar term flips correctly for southern hemisphere zones
-- Art prompt contains `BASE_STYLE` string
-- Art prompt contains seasonal style matching season_bucket
-- Topic lookup uses `(season_bucket, climate_zone_id)` — not just season
-- Quote non-repeat: same quote not returned twice within 14 days
-- Weather fetch uses lat/lon for NWS gridpoint (7 forecast periods returned)
-- Dispatch pre-flight: fails gracefully if Postgres unreachable
-- Dispatch pre-flight: fails gracefully if Ollama unreachable
-- Dispatch pre-flight: alerts if stale zone names in DB
-- All 4 active subscribers receive email in dry-run
-**Status:** ⬜ TODO
+- Master query returns correct GROUP BY grain `(station_code, zipcode, author_key, climate_zone_id, hemisphere)` — ✅ already in master-query.test.js
+- `JSON_AGG(subscribers)` contains correct fields per combo — ✅ already in master-query.test.js
+- Solar term flips correctly for southern hemisphere zones — ✅ already in test_pipeline_extended.py
+- Art prompt contains `BASE_STYLE` string — ✅ added
+- Art prompt contains seasonal style matching season_bucket — ✅ added (4 seasons × parametrize)
+- Topic lookup uses `(season_bucket, climate_zone_id)` — ✅ added (zone param + usage recorded)
+- Quote non-repeat: same quote not returned twice within 14 days — ✅ added
+- Weather fetch uses lat/lon for NWS gridpoint (7 forecast periods returned) — ✅ added
+- Dispatch pre-flight: fails gracefully if Postgres unreachable — ✅ added
+- Dispatch pre-flight: fails gracefully if Ollama unreachable — ✅ added
+- Dispatch pre-flight: alerts if stale zone names in DB — ✅ added (via cursor mock)
+- All 4 active subscribers receive email in dry-run — ✅ added (reads count from DB dynamically)
+**Status:** ✅ DONE — commit `ea61ca8` — `test_pipeline_t3.py` added, 16 tests (15 fast + 1 slow dispatch)
 
 ### T4. Pre-flight checks — build into dispatch
 **Status:** ✅ DONE — commit `9b780df` — `_preflight()` checks DB, stale zones, Ollama, SMTP, NWS; hard-stops with Telegram alert on any error
