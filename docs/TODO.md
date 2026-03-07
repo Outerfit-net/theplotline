@@ -48,13 +48,18 @@
 
 ## 🟡 CONTENT — Missing Pipeline Components
 
-### P1. Topic Bank — expand to `(season_bucket, climate_zone_id)`
+### P1a. Topic Bank — generate for CURRENT active zone+season combos only (do now)
 **File:** `skills/garden-conversation/topic_bank_24.py`
-**Issue:** Currently keyed on solar term name only. Needs `(season_bucket, climate_zone_id)` grain — a topic for "Awakening of Insects" in `florida_keys_tropical` should differ from `alaska_interior`.
-**Spec:** 24 terms × 28 zones × 14 topics = 9,408 topics
-**Non-repeat:** Round-robin per `(season_bucket, climate_zone_id)` tracked in DB
-**Action:** Spawn agent to generate all topics, store in `topics` DB table
+**Scope:** Only the zones + season_buckets that active subscribers actually have right now
+**Current active:** BOU→high_plains/spring, AJK→alaska_south_coastal/spring, KEY→florida_keys_tropical/wet_season
+**Spec:** 3 combos × 14 topics = 42 topics to start
+**Non-repeat:** Round-robin tracked in `topic_usage` DB table `(topic_id, station_code, run_date)`
 **Status:** ⬜ TODO
+
+### P1b. Topic Bank — full expansion to all 28 zones × 24 terms (do later)
+**Spec:** 24 terms × 28 zones × 14 topics = 9,408 topics
+**Action:** Spawn model in a loop, one zone+term at a time, collect results, store in `topics` DB table
+**Status:** ⬜ LATER
 
 ### P2. Quote Module — `garden-quotes.py` (doesn't exist)
 **Spec:** 24 solar terms × 14 quotes = 336 quotes
