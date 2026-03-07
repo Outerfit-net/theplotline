@@ -619,3 +619,132 @@ Working directories used to pass objects between pipeline scripts.
 | Art cache | `/opt/plotlines/data/mastheads/art/generated/` | PNG keyed by `(zone, term_id, condition)` hash | generate_art → masthead |
 | Masthead output | `/opt/plotlines/data/mastheads/` | Final composited PNG, served via `/mastheads/*` | generate_masthead → assembler → email |
 | Archive | `skills/garden-conversation/archive/<station>/<author>/YYYY-MM-DD.md` | Full conversation history | dialogue → next day's dialogue |
+
+---
+
+## Signup Flow
+
+```mermaid
+flowchart TD
+    FORM["Signup Form\n{email, city, state, zipcode, author, plan}"]
+    TURNSTILE["Cloudflare Turnstile\nbot check"]
+    GEO["geocode.js: geocodeWithRetry()\nzipcode → Nominatim postal search\ncity,state → Nominatim city search\n→ {lat, lon}"]
+    NWS["nws.js: getStationInfo()\nlat/lon → NWS points API\n→ observation stations\n→ {station_code}"]
+    ZONE["climate.js: assignClimateZone()\nlat/lon/country → 28 bounded regions\n→ {climate_zone_id}\nclimate.js: getHemisphere()\nlat → {hemisphere} N or S"]
+    LOCKEY["buildLocationKey()\nUS: gridId e.g. BOU\nIntl: rounded lat/lon grid\n→ {location_key}"]
+    DB_SUB[("subscribers\nemail_enc, email_hash\nlat, lon, hemisphere\nclimate_zone_id, station_code\nconfirm_token, unsubscribe_token\nmanagement_token")]
+    DB_COMBO[("combinations\nlocation_key, author_key\nlat, lon, hemisphere\nclimate_zone_id, station_code\nweather_source: nws or open-meteo")]
+    EMAIL["email.js: sendConfirmationEmail()\nconfirm_token link\n→ nodemailer/Gmail SMTP"]
+    CONFIRM["GET /api/confirm/:token\n→ confirmed_at=NOW()"]
+    STRIPE["POST /api/stripe/create-checkout\n→ Stripe Checkout"]
+    WEBHOOK["Stripe webhook\ncheckout.session.completed\n→ subscription_status=active\nbackfill zipcode + re-geocode if missing"]
+
+    FORM --> TURNSTILE --> GEO --> NWS --> ZONE --> LOCKEY
+    LOCKEY --> DB_SUB
+    LOCKEY --> DB_COMBO
+    DB_SUB --> EMAIL --> CONFIRM --> STRIPE --> WEBHOOK
+```
+
+---
+
+## DAG Dispatch Flow
+
+```mermaid
+flowchart TD
+
+    DB_COMBO[("combinations\nstation_code, author_key\nclimate_zone_id, hemisphere\nlat, lon")]
+    DB_SUB[("subscribers\nemail, zipcode\nstation_code, author_key\nactive, confirmed, status")]
+
+    DB_COMBO & DB_SUB -->|"JOIN ON station_code + author_key\nGROUP BY station_code, zipcode\nauthor_key, climate_zone_id\nhemisphere, lat, lon"| QUERY
+
+    QUERY["Master Query Row\n{station_code, zipcode, author_key\nclimate_zone_id, hemisphere\nlat, lon, subscribers[]}"]
+
+    QUERY -->|"unique (station_code, zipcode, lat, lon)"| WEATHER
+    QUERY -->|"unique (climate_zone_id, hemisphere)"| SOLAR
+    QUERY -->|"unique (station_code, climate_zone_id)"| SUBR
+    QUERY -->|"unique (station_code, author_key)"| DIALOGUE
+    QUERY -->|"subscribers[]"| DELIVERY
+
+    WEATHER["garden-weather.py\n(station_code, zipcode, lat, lon)\n→ {condition, forecast}"]
+    SOLAR["garden_seasons.py\n(climate_zone_id, hemisphere)\n→ {season_bucket, season_bucket_description}"]
+
+    WEATHER -->|condition| ART
+    WEATHER -->|condition| TITLEDICT
+    WEATHER -->|forecast| DIALOGUE
+    SOLAR -->|season_bucket, description| ART
+    SOLAR -->|season_bucket, description| DIALOGUE
+    SOLAR -->|season_bucket, climate_zone_id| TOPIC
+    SOLAR -->|season_bucket| QUOTE
+    SOLAR -->|season_bucket, climate_zone_id| TITLEDICT
+
+    SUBR["sub-regions.js\n(station_code, climate_zone_id)\n→ {sub_region_description}"]
+    TOPIC["topic_bank_24.py ⚠️TODO\n(season_bucket, climate_zone_id)\n→ {topic}"]
+    QUOTE["garden-quotes.py ⚠️TODO\n(season_bucket)\n→ {quote}"]
+    AUTH["authors.json\n(author_key)\n→ {style_prompt}"]
+    CHARS["persona-*.md\n(character_key)\n→ {character_souls}"]
+    ARCHIVE[("archive/station/author/\nYYYY-MM-DD.md\nlast 7 days")]
+    TITLEDICT["title_dict.py ⚠️TODO\n(season_bucket, climate_zone_id, condition)\n→ {title}"]
+    ART["generate_art.py\n(condition, season_bucket\nseason_bucket_description)\nSDXL, 30 steps\n→ {png_path}"]
+
+    SUBR --> DIALOGUE
+    TOPIC --> DIALOGUE
+    QUOTE --> DIALOGUE
+    AUTH --> DIALOGUE
+    CHARS --> DIALOGUE
+    ARCHIVE -->|last 7 days| DIALOGUE
+
+    DIALOGUE["garden-dialogue.py\n(author_key)\n3-5 chars, 6-10 turns\n800 char hard limit\n→ {prose}"]
+
+    DIALOGUE --> ARCHIVE
+    ART -->|png_path| MASTHEAD
+    TITLEDICT -->|title| MASTHEAD
+
+    MASTHEAD["generate_masthead.py\n(png_path, title)\n700×200px\n→ {url}"]
+
+    MASTHEAD -->|url| ASSEMBLY
+    DIALOGUE -->|prose| ASSEMBLY
+    QUOTE -->|quote| ASSEMBLY
+
+    ASSEMBLY["garden-assembler.py\n(url, prose, quote, unsubscribe_token)\n→ {html}"]
+
+    ASSEMBLY -->|html| DELIVERY
+    QUOTE -->|quote| DELIVERY
+
+    DELIVERY["garden-mailer.py\nper email_address\n→ email sent"]
+```
+
+---
+
+## Dialogue Flow
+
+```mermaid
+flowchart TD
+    START["run_dialogue()\nauthor_key, weather, topic\nquote, garden_context, term"]
+
+    START --> SELECT["Character Selection\nrandom.sample(CAST, 3-5)\nthen shuffle\n→ chosen[]"]
+
+    SELECT --> SESSIONS["Spawn OpenClaw Sessions\none per character\nsession_id = run-{timestamp}-{character_key}"]
+
+    SESSIONS --> BOOTSTRAP["Bootstrap Loop\neach character in order\nprompt: name, date, season\ntopic, quote, weather\ngarden_context, char_memory\nconvo_so_far\n→ first line from each"]
+
+    BOOTSTRAP --> LOOP["Dialogue Loop\n6-10 turns\nmax total_turns×3 attempts"]
+
+    LOOP --> WEIGHT["Speaker Selection\nprev speaker: weight 0.1\nothers: weight 1.0\n→ speaker_idx"]
+
+    WEIGHT --> PROMPT["Build Turn Prompt\nlast 6 turns of hist\nother_personas (all non-speakers)\nchar_memory (last 7 days)\nweather, garden_context\ntopic, quote, season"]
+
+    PROMPT --> CALL["openclaw agent call\n90s timeout\n2 retries"]
+
+    CALL --> PARSE{"parse_line()\nvalid output?"}
+    PARSE -->|yes| HIST["append to hist\n→ loop"]
+    PARSE -->|no| FALLBACK["skip turn\n→ loop"]
+    HIST --> LOOP
+
+    LOOP -->|hist complete| REFINE["Author Voice Refinement"]
+
+    REFINE --> HAIKU["haiku pass\ndraft prose from raw dialogue\n120s timeout"]
+    HAIKU --> SONNET["sonnet pass\nrewrite in author style\n800 char hard limit"]
+
+    SONNET --> ARCHIVE[("write archive\narchive/station/author/\nYYYY-MM-DD.md")]
+    SONNET --> OUTPUT["{prose, topic, quote, characters}"]
+```
