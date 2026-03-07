@@ -529,7 +529,7 @@ One row per object. Every input and output explicit. Every group by defined.
 | Character Souls | `(character_key)` | `persona-*.md` | `{character_souls}` → Garden Context |
 | History | `(climate_zone_id, sub_region, author_key)` | `archive/` + `daily_runs` | `{history}` → Garden Context |
 | Author Voice | `(author_key)` | `authors.json` | `{author_voice}` → Dialogue |
-| Garden Context | `(climate zone, sub region, season bucket, condition)` | `{forecast, season bucket description, sub region description, topic, quote, character souls, history}` | `{garden context}` → Dialogue |
+| Garden Context | `(climate_zone_id, sub_region, season_bucket)` | `{forecast, season_bucket_description, sub_region_description, topic, quote, character_souls, history}` | `{garden_context}` → Dialogue |
 | Title Dict | `(season_bucket, climate_zone_id, condition)` | `title_dict.py` | `{title}` → Masthead |
 | Art | `(condition, season_bucket, season_bucket_description)` | `generate_art.py` (SDXL) | `{png_path}` → Masthead |
 | Masthead | `(png_path, title)` | `generate_masthead.py` (PIL) | `{url}` → Email Template |
