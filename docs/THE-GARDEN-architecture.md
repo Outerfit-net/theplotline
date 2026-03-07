@@ -570,17 +570,15 @@ One row per object. Every input and output explicit. Every group by defined.
 
 | Step | What Happens | Inputs | Notes |
 |------|-------------|--------|-------|
-| Base style | Always-on aesthetic directive | hardcoded `BASE_STYLE` | `"folksy illustration, hand-drawn, vintage botanical print, old-world charm, not photorealistic, not digital"` — prevents photo/CGI output regardless of season |
-| Seasonal style | Sampled 1-2 styles per season | `(season_bucket)` → `STYLES_BY_SEASON` | Spring: watercolor/risograph/pressed flower \| Summer: silkscreen/gouache/folk art \| Fall: etching/linocut/woodcut \| Winter: woodblock/ink wash/engraving |
-| Subject | Zone + season subject matter | `(climate_zone_id, season_bucket)` → `SUBJECTS_BY_ZONE_SEASON` | ⚠️ TODO: only covers 6 old zones — needs updating for all 28 |
-| Weather modifier | Lighting/tone from condition | `(condition)` → `WEATHER_MODIFIERS` | sunny=warm/high contrast \| cloudy=muted/flat \| rainy=wet/dark \| snowy=sparse/white \| frost=pale blue \| heat=ochre/bleached |
-| Solar term cue | First sentence of description as visual hint | `season_bucket_description` | Grounds image in the specific moment of the season |
-| Prompt assembly | Final prompt | all above | `BASE_STYLE, seasonal_style, subject, term_cue, topic_hint, weather_modifier, garden scene, no text, no people` |
-| Negative prompt | Block unwanted styles | hardcoded | No photos, no people, no 3D, no text, no logo |
-| Model load | Load diffusion pipeline once | `MODEL_ID` (currently SDXL) | `torch.float16`, CUDA, loaded once per batch then unloaded |
+| Base style | Always-on aesthetic | hardcoded | `"folksy illustration, hand-drawn, vintage botanical print, old-world charm, not photorealistic, not digital"` |
+| Seasonal style | 1-2 styles sampled per season | `(season_bucket)` | Spring: `botanical watercolor, risograph print, pressed flower` Summer: `silkscreen, gouache, folk art` Fall: `etching, linocut, woodcut` Winter: `woodblock print, ink wash, engraving` |
+| Subject | Zone + season subject matter | `(climate_zone_id, season_bucket)` | ⚠️ TODO: 22 of 28 zones fall to `high_plains` default |
+| Weather modifier | Lighting/tone | `(condition)` | `sunny`=warm/high contrast `cloudy`=muted/flat `rainy`=wet/dark `snowy`=sparse/white `frost`=pale blue `heat`=ochre/bleached |
+| Solar term cue | First sentence of `season_bucket_description` | `(season_bucket_description)` | Grounds image in the specific seasonal moment |
+| **Full prompt** | **Assembly** | **all above** | `"{base_style}, {seasonal_style}, {subject}, {term_cue}, {topic_hint}, {weather_modifier}, garden scene, no text, no people"` |
+| Negative prompt | Block unwanted output | hardcoded | `"photorealistic, photograph, camera, DSLR, stock photo, 3d render, CGI, ugly, blurry, watermark, text, logo, people, faces"` |
+| Model load | Load diffusion pipeline once | `MODEL_ID` (SDXL) | `torch.float16`, CUDA, loaded once per batch |
 | Generation | Run diffusion | `(prompt, negative_prompt)` | 30 steps, guidance 7.5, native 1024×384 |
 | Resize | Crop to masthead dimensions | `1024×384 → 700×200` | LANCZOS resample |
-| Cache | Save PNG keyed by `(zone, term_id, condition)` hash | `ART_DIR/generated/` | Model-agnostic dir. Reused if same combo runs again same day |
-| VRAM cleanup | Unload model, clear cache | — | `del pipe` + `torch.cuda.empty_cache()` after batch |
-
-⚠️ **TODO:** `SUBJECTS_BY_ZONE_SEASON` only covers 6 old zone names (`high_plains`, `pacific_coast`, `midwest`, `southeast`, `southwest`, `northeast`). 22 of 28 zones fall through to `high_plains` default. Needs subjects for all 28 current zones.
+| Cache | Save PNG | `(zone, term_id, condition)` hash | `ART_DIR/generated/` — model-agnostic |
+| VRAM cleanup | Unload model | — | `del pipe` + `torch.cuda.empty_cache()` |
