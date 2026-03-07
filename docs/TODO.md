@@ -194,3 +194,10 @@ Tests we need that don't exist:
 2. **Sekki cue = first sentence of description only** (`split(".")[0]`) — for Awakening of Insects this is `"Turn over a clod of earth and you'll find them: pale worms, a beetle tucking back into the dark"` which caused SDXL to paint a cockroach. Should use a garden-focused extract from the full description, not the opening sentence verbatim.
 **Fix:** Replace `SUBJECTS_BY_ZONE_SEASON` lookup with sekki-aware subjects; replace `term_cue = term["description"].split(".")[0]` with a curated garden-focused phrase derived from the full description.
 **Status:** ⬜ TODO
+
+---
+
+### D1. --no-send flag not respected by mailer
+**Issue:** `--no-send` flag does not prevent email delivery. Dispatch sent 2 emails during masthead stage of step-through when it should have held. The `no_send` value is not being passed correctly through to the `send()` function call path.
+**Fix:** Trace `no_send` through `run_dispatch` → `send()` — likely a missing pass-through somewhere in the call chain.
+**Status:** ⬜ TODO
