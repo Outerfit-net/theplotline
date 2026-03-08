@@ -6,6 +6,12 @@
 
 ## 🟡 ART — Prompt Quality
 
+### AR3. Art requires weather — enforce dependency explicitly
+**Issue:** Art generation falls back to `cloudy` when `weather_condition` is null (subscriber has no cached weather). This causes wrong cache key and wrong imagery. The art stage must not run without a real weather condition.
+**Fix:** In dispatch, enforce that weather runs before art. If `weather_condition` is null at art time, fail loudly rather than silently falling back to `cloudy`.
+**File:** `garden-dispatch.py` — art stage dependency check
+**Status:** ⬜ TODO
+
 ### AR1. Climate zone underscores in prompt — transform for readability
 **Issue:** `<climate_zone>florida_keys_tropical</climate_zone>` — underscores may confuse the model. Should be `florida keys tropical`.
 **Fix:** In `build_prompt()`, replace underscores with spaces before injecting zone into `<climate_zone>` tag.
