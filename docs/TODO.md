@@ -21,13 +21,8 @@
 **Status:** ✅ DONE
 
 ### AR4. Remove dead code from generate_art.py
-**Issue:** Three data structures defined but never called — dead code, ~190 lines:
-- `SUBJECTS_BY_ZONE_SEASON` (line 42) — replaced by sekki `visual_cue`/`_transform_description()`
-- `STYLES_BY_SEASON` (line 216) — never wired into prompt
-- `WEATHER_MODIFIERS` (line 224) — never wired into prompt
-**Fix:** Delete all three. If `STYLES_BY_SEASON` and `WEATHER_MODIFIERS` are worth keeping for AR2, move them to a comment block or spec doc.
-**File:** `generate_art.py` lines 42–231
-**Status:** ⬜ TODO
+**Fix:** Deleted SUBJECTS_BY_ZONE_SEASON, STYLES_BY_SEASON, WEATHER_MODIFIERS — 190 lines gone. Prompt output verified identical.
+**Status:** ✅ DONE — commit 770130b
 
 ### AR2. Art styles library — comprehensive technique list for randomized prompt injection (NICE TO HAVE)
 **File:** `generate_art.py` — add `ART_STYLES` data structure
