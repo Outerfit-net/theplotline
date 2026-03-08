@@ -282,7 +282,7 @@ Tests we need that don't exist:
 ### CH1. Muso Maple persona hardcoded to Colorado — refuses to engage in other zones
 **Issue:** `persona-muso-maple.md` references "Colorado's high plains" explicitly in the 72 micro-seasons section. When Muso runs for an Alaska subscriber, the model takes the geographic identity so seriously it refuses to discuss Alaskan gardening at all. The "stateless" framing already in the file ("Japanese garden principles translate to any climate. The maple species changes. The silence doesn't.") is the right idea but gets overridden by the Colorado specifics.
 **Fix:** Remove or generalize the Colorado reference. Replace with zone-adaptive language — Muso applies the 72 micro-season *principle* to whatever zone he's in, not Colorado specifically.
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit 8e8f6ea
 
 ---
 
