@@ -280,8 +280,7 @@ Tests we need that don't exist:
 **Status:** ✅ DONE — commit `ea61ca8` — `test_pipeline_t3.py` added, 16 tests (15 fast + 1 slow dispatch)
 
 ### T5. Modularize Python test suite — never run all tests at once
-**Issue:** Running `pytest test_pipeline*.py` hits the full pipeline including dialogue (2+ min, spawns LLM calls). Tests need to be modular so individual classes/modules can be run in isolation.
-**Fix:** Split into focused test files by module (test_art.py, test_weather.py, test_dialogue.py etc). Update SKILL.md for plotlines-agent and plotlines-interactive to explicitly forbid running the full pytest suite without permission.
+**See DEV3 above — same item, tracked there with full spec.**
 **Status:** ⬜ TODO
 
 ### T4. Pre-flight checks — build into dispatch
