@@ -32,11 +32,6 @@
 **File:** `garden-dialogue.py` — `refine_to_prose()` and/or `h_prompt`
 **Status:** ⬜ TODO
 
-### CH2. Clean stale entries from garden-context-cache.json
-**Issue:** Old city-code keyed entries (`BOU`, `KEY`, `AJK`, `PQR`, `PSR`, `MLB`) in `garden-context-cache.json` are never hit by current code (new key format is `zone:sub_region:season_bucket:condition`) but contain city/state-specific language that could bleed into dialogue if anything reads them. Dead weight.
-**Fix:** Delete the old-format keys from the cache file. New zone-keyed entries are all correct.
-**File:** `skills/garden-conversation/garden-context-cache.json`
-**Status:** ⬜ TODO — low priority, current code never hits these keys
 
 ### OPS1. Verify daily DB backup to R2 is running
 **Verified 2026-03-08:** Cron fires at 2 AM daily. Last two runs successful — plotlines + thread DBs both pushed to R2. Restore not yet tested.
