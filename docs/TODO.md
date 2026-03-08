@@ -10,7 +10,7 @@
 **Issue:** `--skip-art`, `--skip-dialogue`, `--skip-weather`, `--skip-masthead` flags raise `RuntimeError` when cache is missing instead of just running the stage. The whole point of the interactive runner is to run any single stage standalone without dependencies. Weather should run weather. Art should run art. Period.
 **Fix:** Rewrite skip logic in `garden-dispatch.py` — skip flags mean "skip this stage and use cache IF available, otherwise run it." No raises. No hard dependencies between stages.
 **File:** `garden-dispatch.py` — all `--skip-*` logic blocks
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit e0fb2b0
 
 ### AR3. Art requires weather — enforce dependency explicitly
 **Issue:** Art generation falls back to `cloudy` when `weather_condition` is null (subscriber has no cached weather). This causes wrong cache key and wrong imagery. The art stage must not run without a real weather condition.
