@@ -65,7 +65,7 @@
 - Per-suite summary: pass/fail/skip counts + time
 - Non-zero exit on any failure
 - NEVER run LLM tests without explicit flag
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit 38dd2f7
 
 ---
 
