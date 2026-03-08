@@ -4,6 +4,16 @@
 
 ---
 
+## 🔴 EMAIL — Sender Identity
+
+### EML1. "From" name is "garden" — should be a proper sender name
+**Issue:** Emails arrive with `From: garden` in the inbox. Looks broken/spammy.
+**Fix:** Set a proper friendly sender name. Options: "The Daily Plot Line", "The Plot Line", "Plot Lines" — decide and update the mailer config/SMTP From header.
+**File:** `garden-mailer.py` (or wherever the From header / SMTP envelope is set)
+**Status:** ⬜ TODO
+
+---
+
 ## 🔴 INFRASTRUCTURE — Dev Environment & CI/CD
 
 ### CH3. Harry Kvetch character drift — prose refinement erasing his kvetching
