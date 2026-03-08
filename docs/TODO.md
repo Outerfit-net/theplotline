@@ -19,10 +19,8 @@
 **Status:** ⬜ TODO
 
 ### AR1. Climate zone underscores in prompt — transform for readability
-**Issue:** `<climate_zone>florida_keys_tropical</climate_zone>` — underscores may confuse the model. Should be `florida keys tropical`.
-**Fix:** In `build_prompt()`, replace underscores with spaces before injecting zone into `<climate_zone>` tag.
-**File:** `generate_art.py: build_prompt()`
-**Status:** ⬜ TODO
+**Fix:** `zone_label = zone.replace("_", " ")` in `build_prompt()` — line 272
+**Status:** ✅ DONE
 
 ### AR2. Art styles library — comprehensive technique list for randomized prompt injection (NICE TO HAVE)
 **File:** `generate_art.py` — add `ART_STYLES` data structure
@@ -257,11 +255,8 @@ Tests we need that don't exist:
 ---
 
 ### A1. Art prompt — wrong grain and bad sekki cue
-**Issue:** Two problems with `generate_art.py` `build_prompt()`:
-1. **Zone subjects use coarse season bucket** (`spring/summer/fall/winter`) not sekki — `high_plains/spring` always gives `crocus shoots, bare soil, frost-touched grass` regardless of which of the 6 spring sekki we're in. Should use sekki name or description to drive subject.
-2. **Sekki cue = first sentence of description only** (`split(".")[0]`) — for Awakening of Insects this is `"Turn over a clod of earth and you'll find them: pale worms, a beetle tucking back into the dark"` which caused SDXL to paint a cockroach. Should use a garden-focused extract from the full description, not the opening sentence verbatim.
-**Fix:** Replace `SUBJECTS_BY_ZONE_SEASON` lookup with sekki-aware subjects; replace `term_cue = term["description"].split(".")[0]` with a curated garden-focused phrase derived from the full description.
-**Status:** ⬜ TODO
+**Fix:** `build_prompt()` now uses `term.get("visual_cue") or _transform_description(term["description"])` — sekki-aware, no raw first-sentence injection. `SUBJECTS_BY_ZONE_SEASON` is dead code (defined but never called).
+**Status:** ✅ DONE
 
 ---
 
