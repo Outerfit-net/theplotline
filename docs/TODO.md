@@ -272,10 +272,10 @@ Tests we need that don't exist:
 
 ---
 
-### W3. Test subscribers missing zipcode — never went through Stripe webhook
-**Issue:** BOU/hemingway and KEY/munro subscribers have no zipcode because they were created directly in DB, bypassing the Stripe checkout webhook that backfills `postal_code` from Stripe billing address. The backfill code in `stripe.js` is correct but never fired.
-**Fix:** Manually backfill zipcodes for test subscribers: mdcscry@yahoo.com (80302), moltibot@agentmail.to (80302), outerfit.net@gmail.com (33040). Run UPDATE via admin or psql with encryption.
-**Status:** ⬜ TODO
+### W3. Test subscribers missing zipcode
+**Partial fix:** AJK (99812) and BOU (80303/80308) backfilled. KEY/munro (outerfit.net@gmail.com) still has empty zipcode — needs 33040 backfilled.
+**Fix:** UPDATE subscribers SET zipcode = pgp_sym_encrypt('33040', KEY) WHERE email_hash = '3fb3596370aaac21aa72651ed9fe96215bf01543b13b0a81d3fb9b89a8cf6adf'
+**Status:** ⬜ TODO — one sub remaining (KEY/munro)
 
 ---
 
