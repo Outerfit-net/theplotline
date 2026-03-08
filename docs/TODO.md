@@ -10,7 +10,7 @@
 **Issue:** Emails landing in spam. SPF/DKIM/DMARC are set. Remaining gaps:
 
 1. **From fixed** ✅ — `PlotLines@theplotline.net` (commit 5d36ebd)
-2. **Reply-To missing** — never wired up. Should be `support@theplotline.net` (or whatever the real support address is). Set `msg['Reply-To']` in `_send_one()` in `garden-mailer.py`. Add `SMTP_REPLY_TO` env var.
+2. **Reply-To** ✅ — `support@theplotline.net` (commit 49ace8a)
 3. **List-Unsubscribe header missing** — required by Gmail/Yahoo for bulk senders. Add to `_send_one()`:
    ```python
    msg['List-Unsubscribe'] = f'<{unsub_url}>, <mailto:unsubscribe@theplotline.net?subject=unsubscribe>'
