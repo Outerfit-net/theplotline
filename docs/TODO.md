@@ -6,6 +6,13 @@
 
 ## 🔴 INFRASTRUCTURE — Dev Environment & CI/CD
 
+### CH3. Harry Kvetch character drift — prose refinement erasing his kvetching
+**Issue:** Harry Kvetch's core personality (chronic complainer, grumpy, short bursts, "everything is wrong") is being smoothed out by the Hemingway prose refinement pass. The literary style rewrite homogenizes all characters into the same spare, stoic voice. Harry ends up sounding thoughtful and controlled — the opposite of who he is.
+**Root cause:** `refine_to_prose()` and the Hemingway style prompt have no instruction to preserve character-specific voice signatures. The style pass overwrites personality.
+**Fix:** Add a character voice preservation rule to the refinement prompt — something like: "Preserve each character's defining voice signature. Harry Kvetch complains; Muso Maple speaks in Zen fragments; etc. The literary style should live in prose texture (sentence rhythm, imagery, word choice), not character personality."
+**File:** `garden-dialogue.py` — `refine_to_prose()` and/or `h_prompt`
+**Status:** ⬜ TODO
+
 ### CH2. Clean stale entries from garden-context-cache.json
 **Issue:** Old city-code keyed entries (`BOU`, `KEY`, `AJK`, `PQR`, `PSR`, `MLB`) in `garden-context-cache.json` are never hit by current code (new key format is `zone:sub_region:season_bucket:condition`) but contain city/state-specific language that could bleed into dialogue if anything reads them. Dead weight.
 **Fix:** Delete the old-format keys from the cache file. New zone-keyed entries are all correct.
