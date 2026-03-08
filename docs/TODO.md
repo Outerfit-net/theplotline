@@ -354,8 +354,3 @@ Tests we need that don't exist:
 **Status:** ✅ DONE — commit 8e8f6ea
 
 ---
-
-### W4. wind_mph unit conversion wrong for km/h stations
-**Issue:** NWS obs returns `windSpeed` in `wmoUnit:km_h-1` for some stations (incl. KEYW), but code was applying m/s → mph multiplier (×2.237). Result: 18.5 km/h reported as 41 mph, 26 km/h as 58 mph.
-**Fix:** Check `unitCode` and branch: km/h → ÷1.609, m/s → ×2.237.
-**Status:** ✅ DONE — commit 69bfe43
