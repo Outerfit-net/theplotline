@@ -8,9 +8,9 @@
 
 ### EML1. "From" name is "garden" — should be a proper sender name
 **Issue:** Emails arrive with `From: garden` in the inbox. Looks broken/spammy.
-**Fix:** Set a proper friendly sender name. Options: "The Daily Plot Line", "The Plot Line", "Plot Lines" — decide and update the mailer config/SMTP From header.
-**File:** `garden-mailer.py` (or wherever the From header / SMTP envelope is set)
-**Status:** ⬜ TODO
+**Fix:** `SMTP_FROM=PlotLines@theplotline.net` — set in `/opt/plotlines/.env` and updated default in `garden-mailer.py`.
+**Note:** `plotlines@theplotline.net` is an alias to support@ — not a real inbox. Resend sends from the verified `theplotline.net` domain so this should work. Confirm in Resend dashboard that the alias is accepted, or add it as a verified sender.
+**Status:** ✅ DONE — commit 5d36ebd (pending Resend alias verification)
 
 ---
 
