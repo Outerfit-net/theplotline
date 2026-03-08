@@ -211,6 +211,13 @@ Tests we need that don't exist:
 
 ---
 
+### CH1. Muso Maple persona hardcoded to Colorado — refuses to engage in other zones
+**Issue:** `persona-muso-maple.md` references "Colorado's high plains" explicitly in the 72 micro-seasons section. When Muso runs for an Alaska subscriber, the model takes the geographic identity so seriously it refuses to discuss Alaskan gardening at all. The "stateless" framing already in the file ("Japanese garden principles translate to any climate. The maple species changes. The silence doesn't.") is the right idea but gets overridden by the Colorado specifics.
+**Fix:** Remove or generalize the Colorado reference. Replace with zone-adaptive language — Muso applies the 72 micro-season *principle* to whatever zone he's in, not Colorado specifically.
+**Status:** ⬜ TODO
+
+---
+
 ### W4. wind_mph field may be pulling gust reading instead of sustained wind
 **Issue:** KEY station reported `wind_mph: 58.0` on 2026-03-07 while the NWS forecast text only mentioned 15–20 knots (~17–23 mph). The current observation field may be pulling a peak gust, not the sustained wind speed, from the NWS obs API.
 **Fix:** Check the NWS obs JSON field being used for `wind_mph` — if it's `windGust` or a combined field, switch to `windSpeed` (sustained). Key West sits on open water so gust spikes are common and unrepresentative. Show both sustained + gust in the report when they differ significantly. The NWS narrative text (forecast/AFD) is the reliable piece — use that as the source of truth for prose. Add a sanity cap or warning if wind_mph > 50 mph and no storm/hurricane condition is present.
