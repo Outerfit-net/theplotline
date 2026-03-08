@@ -116,6 +116,34 @@ pm2 save
 
 ## Testing
 
+### Python Pipeline Tests
+
+```bash
+cd /home/administrator/openclaw/skills/garden-conversation
+
+# Fast (no LLM, no network) — default, ~4s
+python3 run_tests.py --fast
+
+# Single suite
+python3 run_tests.py art
+python3 run_tests.py seasons
+python3 run_tests.py art weather seasons dialogue dispatch
+
+# With network (Postgres, NWS API)
+python3 run_tests.py --network
+
+# With LLM calls (slow, ~2+ min) — explicit permission only
+python3 run_tests.py --slow
+
+# Everything: all Python marks + Node
+python3 run_tests.py --all
+```
+
+Suites: `art` | `weather` | `seasons` | `dialogue` | `dispatch`
+Marks: `@pytest.mark.slow` (LLM), `@pytest.mark.network` (Postgres/NWS)
+
+### Node Server Tests
+
 ```bash
 # Run all tests
 cd /opt/plotlines/server && npm test

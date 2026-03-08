@@ -14,8 +14,12 @@
 3. **Tests must test the real pipeline.** Tests that pass while the app is broken are worse than no tests. Run both test suites before every commit:
    ```bash
    cd /opt/plotlines/server && npm test                          # Node — 7s
-   python3 -m pytest ~/openclaw/skills/garden-conversation/test_pipeline.py -v  # Python — 3 min
+   cd ~/openclaw/skills/garden-conversation
+   python3 run_tests.py --fast          # fast only, ~4s
+   python3 run_tests.py --network       # includes Postgres + NWS, ~30s
+   python3 run_tests.py --all           # everything including LLM, ~3 min
    ```
+   Suites: `tests/test_art.py`, `test_weather.py`, `test_seasons.py`, `test_dialogue.py`, `test_dispatch.py`
 
 4. **The Python pipeline scripts read from Postgres.** `garden-dispatch.py`, `garden-assembler.py`, `garden-mailer.py` all use `psycopg2`. `DATABASE_URL` and `DB_ENCRYPTION_KEY` from `/opt/plotlines/.env`.
 
@@ -295,7 +299,7 @@ ORDER BY
 | Topic ⚠️ TODO: generate 14 per `(season_bucket, climate_zone_id)` | `(season_bucket, climate_zone_id)` | `{topic}` → Dialogue |
 | Quote ⚠️ TODO: `garden-quotes.py`, 14 per `season_bucket` | `(season_bucket)` | `{quote}` → Dialogue, Delivery |
 | Title Dict ⚠️ TODO: pre-generate per group by | `(season_bucket, climate_zone_id, condition)` | `{title}` → Masthead |
-| Art | `({condition, season_bucket, season_bucket_description})` | `{png_path}` → Masthead |
+| Art | `({condition, solar_term{name, description}})` | `{png_path}` → Masthead |
 | Masthead | `({png_path, title})` | `{url}` → Delivery |
 | Author Voice | `(author_key)` | `{author_voice}` → Dialogue |
 | Dialogue | `(author_key, {forecast, season_bucket_description, sub_region_description, topic, quote, author_voice, character_souls})` | `{prose}` → Delivery |
@@ -360,22 +364,32 @@ Real tables: `subscribers`, `combinations`, `climate_zones`, `daily_runs`, `deli
 # Node.js (API, webhooks, climate, geocoding) — 182 tests, ~7s
 cd /opt/plotlines/server && npm test
 
-# Python (full pipeline integration) — 16 tests, ~3 min
-python3 -m pytest ~/openclaw/skills/garden-conversation/test_pipeline.py -v
+# Python pipeline — fast (no LLM, no network), ~4s
+cd ~/openclaw/skills/garden-conversation && python3 run_tests.py --fast
+
+# Python pipeline — with network (Postgres + NWS), ~30s
+python3 run_tests.py --network
+
+# Python pipeline — everything including LLM, ~3 min
+python3 run_tests.py --all
 ```
 
 **Both green = DAG works. Ship it.**
 
-| Suite | Tests | What it proves |
-|-------|-------|---------------|
-| `climate.test.js` | 63 | Zone assignment correct for real coordinates |
-| `stripe-webhook.test.js` | 11 | Money flow — activation, cancel, renewal |
-| `webhook-zipcode-backfill.test.js` | 9 | Zip/geo backfill all 4 cases |
-| `geocode-validation.test.js` | 7 | Key West, Juneau, Alaska zones correct |
-| `location-outliers.test.js` | ~16 | Extreme locations don't crash |
-| `zip-coverage.test.js` | ~8 | Sampled US zip coverage |
-| `admin.test.js` | 2 | International subscribers, encryption |
-| `test_pipeline.py` | 16 | DB, zones, solar terms, weather, art, dialogue, masthead, dry-run, decryption, zero SQLite |
+| Suite | Tests | Marks | What it proves |
+|-------|-------|-------|---------------|
+| `climate.test.js` | 63 | — | Zone assignment correct for real coordinates |
+| `stripe-webhook.test.js` | 11 | — | Money flow — activation, cancel, renewal |
+| `webhook-zipcode-backfill.test.js` | 9 | — | Zip/geo backfill all 4 cases |
+| `geocode-validation.test.js` | 7 | — | Key West, Juneau, Alaska zones correct |
+| `location-outliers.test.js` | ~16 | — | Extreme locations don't crash |
+| `zip-coverage.test.js` | ~8 | — | Sampled US zip coverage |
+| `admin.test.js` | 2 | — | International subscribers, encryption |
+| `tests/test_seasons.py` | 20 | — | Solar terms, hemisphere flip, tropical wet/dry, zone offsets |
+| `tests/test_art.py` | 12+3 | `slow` | Prompt structure, cache key, PNG output |
+| `tests/test_weather.py` | 6 | `network` | Full interface contract, obs fallback, forecast |
+| `tests/test_dialogue.py` | 7+3 | `slow`/`network` | Character memory, topic fallback, zone awareness, quotes |
+| `tests/test_dispatch.py` | 3+12 | `slow`/`network` | DB, zone lookup, decryption, no-sqlite, dry-run, preflight |
 
 ---
 
@@ -453,7 +467,7 @@ All static lookup data used by the pipeline.
 | `server/services/sub-regions.js` | Sub-region | `(station_code, climate_zone_id)` | `{sub_region_description}` |
 | `topic_bank_24.py` ⚠️ TODO | Topic | `(season_bucket, climate_zone_id)` | `{topic}` |
 | `garden-quotes.py` ⚠️ TODO: doesn't exist | Quote | `(season_bucket)` | `{quote}` |
-| `generate_art.py` | Art | `({condition, season_bucket, season_bucket_description})` | `{png_path}` |
+| `generate_art.py` | Art | `({condition, solar_term{name, description}})` | `{png_path}` |
 | `generate_masthead.py` | Masthead | `({png_path, title})` | `{url}` |
 | `title_dict.py` | Title Dict | `(season_bucket=sekki_name, climate_zone_id, condition)` | `{title}` |
 | `authors.json` | Author Voice | `(author_key)` | `{author_voice}` |
@@ -530,7 +544,7 @@ One row per object. Every input and output explicit. Every group by defined.
 | Author Voice | `(author_key)` | `authors.json` | `{author_voice}` → Dialogue |
 | Garden Context | `(climate_zone_id, sub_region, season_bucket, condition)` | `{season_bucket_description, sub_region_description, condition}` | `{garden_context}` → Dialogue |
 | Title Dict | `(season_bucket=sekki_name, climate_zone_id, condition)` | `title_dict.py` | `{title}` → Masthead |
-| Art | `(condition, season_bucket, season_bucket_description)` | `generate_art.py` (SDXL) | `{png_path}` → Masthead |
+| Art | `(condition, solar_term{name, description})` | `generate_art.py` (SDXL) | `{png_path}` → Masthead |
 | Masthead | `(png_path, title)` | `generate_masthead.py` (PIL) | `{url}` → Email Template |
 | Dialogue | `(date, climate_zone_id, sub_region, author_key)` | `{garden_context, author_voice}` | `{prose}` → Prose |
 | Prose | `(date, climate_zone_id, sub_region, author_key)` | `{prose}` | `{prose}` → Garden Context (as past prose), Email Template |
@@ -552,7 +566,7 @@ One row per object. Every input and output explicit. Every group by defined.
 | `server/services/sub-regions.js` | Sub-region description | `(station_code, climate_zone_id)` |
 | `topic_bank_24.py` ⚠️ TODO | Topic | `(season_bucket, climate_zone_id)` |
 | `garden-quotes.py` ⚠️ TODO: doesn't exist | Quote | `(season_bucket)` |
-| `generate_art.py` | Art | `({condition, season_bucket, season_bucket_description})` |
+| `generate_art.py` | Art | `({condition, solar_term{name, description}})` |
 | `generate_masthead.py` | Masthead | `({png_path, title})` |
 | `title_dict.py` | Title Dict | `(season_bucket=sekki_name, climate_zone_id, condition)` |
 | `authors.json` | Author Voice (15 voices) | `(author_key)` |
@@ -595,10 +609,10 @@ One row per object. Every input and output explicit. Every group by defined.
 |------|-------------|--------|-------|
 | Base style | Always-on aesthetic | hardcoded | `"folksy illustration, hand-drawn, vintage botanical print, old-world charm, not photorealistic, not digital"` |
 | Seasonal style | 1-2 styles sampled per season | `(season_bucket)` | Spring: `botanical watercolor, risograph print, pressed flower` Summer: `silkscreen, gouache, folk art` Fall: `etching, linocut, woodcut` Winter: `woodblock print, ink wash, engraving` |
-| Subject | Zone + season subject matter | `(climate_zone_id, season_bucket)` | ⚠️ TODO: 22 of 28 zones fall to `high_plains` default |
+| Subject | Zone + sekki subject matter | `(climate_zone_id, sekki_name)` | ⚠️ TODO: currently keyed on coarse season bucket, not sekki name |
 | Weather modifier | Lighting/tone | `(condition)` | `sunny`=warm/high contrast `cloudy`=muted/flat `rainy`=wet/dark `snowy`=sparse/white `frost`=pale blue `heat`=ochre/bleached |
-| Solar term cue | First sentence of `season_bucket_description` | `(season_bucket_description)` | Grounds image in the specific seasonal moment |
-| **Full prompt** | **Assembly** | **all above** | `"{base_style}, {seasonal_style}, {subject}, {term_cue}, {topic_hint}, {weather_modifier}, garden scene, no text, no people"` |
+| Solar term cue | Transformed sekki description (punctuation stripped) | `(solar_term.description)` | ⚠️ TODO: currently uses first sentence only; needs full description with punctuation transformed |
+| **Full prompt** | **Assembly** | **all above** | `"{base_style}, {seasonal_style}, {subject}, {term_cue}, {weather_modifier}, garden scene, no text, no people"` |
 | Negative prompt | Block unwanted output | hardcoded | `"photorealistic, photograph, camera, DSLR, stock photo, 3d render, CGI, ugly, blurry, watermark, text, logo, people, faces"` |
 | Model load | Load diffusion pipeline once | `MODEL_ID` (SDXL) | `torch.float16`, CUDA, loaded once per batch |
 | Generation | Run diffusion | `(prompt, negative_prompt)` | 30 steps, guidance 7.5, native 1024×384 |
@@ -674,7 +688,7 @@ flowchart TD
     WEATHER -->|condition| ART
     WEATHER -->|condition| TITLEDICT
     WEATHER -->|forecast| GARDENCTX
-    SOLAR -->|season_bucket, description| ART
+    SOLAR -->|name, description| ART
     SOLAR -->|season_bucket, description| GARDENCTX
     SOLAR -->|season_bucket, climate_zone_id| TOPIC
     SOLAR -->|season_bucket| QUOTE
@@ -687,7 +701,7 @@ flowchart TD
     CHARS["persona-*.md\n(character_key)\n→ {character_souls}"]
     PROSE_CACHE[("prose cache\ndate, climate_zone_id\nsub_region, author_key\nlast 7 days")]
     TITLEDICT["title_dict\n(season_bucket=sekki_name, climate_zone_id, condition)\nDB cache — self-populates on miss\nbatch: all 7 conditions at once via Haiku\n→ {title}"]
-    ART["generate_art.py\n(condition, season_bucket\nseason_bucket_description)\nSDXL, 30 steps\n→ {png_path}"]
+    ART["generate_art.py\n(condition, solar_term{name, description})\nSDXL, 30 steps\n→ {png_path}"]
 
     SUBR -->|sub_region_description| GARDENCTX
     TOPIC -->|topic| GARDENCTX
@@ -829,7 +843,7 @@ Script: `garden-dialogue.py`
 
 ### art
 ```
-IN:  climate_zone_id, condition, solar_term{name, description}, topic, date
+IN:  climate_zone_id, condition, solar_term{name, description}, date
 OUT: {
   image_path  # local path to generated PNG
 }
