@@ -313,7 +313,12 @@ def cache_key(station, author, season, weather, solar_term=None, art_layer=None,
     if solar_term:
         base += f":{solar_term}"
     if art_layer:
-        base += f":{art_layer}"
+        # Hash file contents, not just path — so regenerated art always busts the masthead cache
+        try:
+            art_hash = hashlib.md5(Path(art_layer).read_bytes()).hexdigest()
+        except Exception:
+            art_hash = art_layer  # fallback to path if file unreadable
+        base += f":{art_hash}"
     if run_date:
         base += f":{run_date}"
     return hashlib.md5(base.encode()).hexdigest()
