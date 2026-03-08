@@ -355,7 +355,7 @@ Tests we need that don't exist:
 
 ---
 
-### W4. wind_mph field may be pulling gust reading instead of sustained wind
-**Issue:** KEY station reported `wind_mph: 58.0` on 2026-03-07 while the NWS forecast text only mentioned 15–20 knots (~17–23 mph). The current observation field may be pulling a peak gust, not the sustained wind speed, from the NWS obs API.
-**Fix:** Check the NWS obs JSON field being used for `wind_mph` — if it's `windGust` or a combined field, switch to `windSpeed` (sustained). Key West sits on open water so gust spikes are common and unrepresentative. Show both sustained + gust in the report when they differ significantly. The NWS narrative text (forecast/AFD) is the reliable piece — use that as the source of truth for prose. Add a sanity cap or warning if wind_mph > 50 mph and no storm/hurricane condition is present.
-**Status:** ⬜ TODO
+### W4. wind_mph unit conversion wrong for km/h stations
+**Issue:** NWS obs returns `windSpeed` in `wmoUnit:km_h-1` for some stations (incl. KEYW), but code was applying m/s → mph multiplier (×2.237). Result: 18.5 km/h reported as 41 mph, 26 km/h as 58 mph.
+**Fix:** Check `unitCode` and branch: km/h → ÷1.609, m/s → ×2.237.
+**Status:** ✅ DONE — commit 69bfe43
