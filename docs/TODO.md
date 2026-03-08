@@ -1,6 +1,53 @@
 # Plot Lines — TODO
-*Last Updated: 2026-03-07*
+*Last Updated: 2026-03-08*
 *Keep this in sync with THE-GARDEN-architecture.md. When a TODO is done, mark it ✅ and note the commit.*
+
+---
+
+## 🔴 INFRASTRUCTURE — Dev Environment & CI/CD
+
+### DEV1. Create development environment + git workflow
+**Issue:** No dev environment exists. All work happens directly on production. Need a clean promotion path before this goes to real paying subscribers.
+**Spec:**
+- `dev` branch → runs on a dev port (e.g. 3002) on the same box, or a separate process
+- `master` branch → production (port 3001, current cron)
+- GitHub Action or webhook: merge to master → pull + restart prod server
+- Dev DB or dev schema (separate `plotlines_dev` DB or `dev_` table prefix) so test sends don't hit prod subscribers
+- Dev cron optional — manual dispatch only in dev
+- Promote path: dev branch → PR → merge to master → auto-deploy
+**Files:** `/opt/plotlines/server/`, `.github/workflows/`, `run-dispatch.sh`
+**Status:** ⬜ TODO — blocking production readiness
+
+### DEV2. Update runbook — badly out of date
+**Issue:** Runbook was written before: dispatch-step.py, two-mode DAG contract, --test-subs, --fresh, is_test column, new test organization, plotlines-agent skill. Needs a full rewrite.
+**Spec:**
+- Two production modes (cron / --fresh)
+- dispatch-step.py as the only testing interface
+- Test subscriber management (is_test flag)
+- How to run tests (individual suites + master runner)
+- Deploy workflow (once DEV1 is done)
+- Cron schedule and log location
+- Secrets management (Bitwarden)
+**File:** `/opt/plotlines/docs/RUNBOOK.md`
+**Status:** ⬜ TODO
+
+### DEV3. T5 — Reorganize Python test suite + master test runner
+**Issue:** Three monolithic test_pipeline*.py files — can't run individual suites without triggering LLM calls. No master runner.
+**Spec:**
+- Split into: `test_art.py`, `test_weather.py`, `test_seasons.py`, `test_dialogue.py`, `test_dispatch.py`
+- Markers: `@pytest.mark.slow` (LLM), `@pytest.mark.network` (NWS fetch)
+- `run_tests.py` master runner:
+  ```bash
+  python3 run_tests.py                    # full suite
+  python3 run_tests.py art seasons        # specific suites
+  python3 run_tests.py --fast             # skip slow + network
+  python3 run_tests.py --node             # Node suite only
+  python3 run_tests.py --all              # Python + Node
+  ```
+- Per-suite summary: pass/fail/skip counts + time
+- Non-zero exit on any failure
+- NEVER run LLM tests without explicit flag
+**Status:** ⬜ TODO
 
 ---
 
