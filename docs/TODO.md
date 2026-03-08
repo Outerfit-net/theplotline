@@ -177,9 +177,8 @@
 ---
 
 ### W1. Condition bucket not zip-specific
-**Issue:** `classify_condition()` reads NWS obs station — same grid area subscribers get same condition regardless of local variation. A 6-hour-ahead per-zip forecast from NWS/Open-Meteo would be more accurate.
-**Known limitation:** condition drives art and title only — quality issue, not correctness.
-**Status:** ⬜ NEEDS REVIEW — was LATER, needs reassessment of whether current per-zip forecast fetch is sufficient or still using grid obs
+**Closed by design.** Weather grain is per-station, matching the newsletter edition grain `(station, author)`. Per-zip weather would require per-subscriber art and titles, blowing up the GROUP BY. The AFD narrative gives dialogue plenty of local texture. Early desire, superseded by architecture.
+**Status:** ✅ CLOSED — by design
 
 ---
 
