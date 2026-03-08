@@ -6,11 +6,20 @@
 
 ## 🔴 EMAIL — Sender Identity
 
-### EML1. "From" name is "garden" — should be a proper sender name
-**Issue:** Emails arrive with `From: garden` in the inbox. Looks broken/spammy.
-**Fix:** `SMTP_FROM=PlotLines@theplotline.net` — set in `/opt/plotlines/.env` and updated default in `garden-mailer.py`.
-**Note:** `plotlines@theplotline.net` is an alias to support@ — not a real inbox. Resend sends from the verified `theplotline.net` domain so this should work. Confirm in Resend dashboard that the alias is accepted, or add it as a verified sender.
-**Status:** ✅ DONE — commit 5d36ebd (pending Resend alias verification)
+### EML1. Email deliverability — From, Reply-To, List-Unsubscribe
+**Issue:** Emails landing in spam. SPF/DKIM/DMARC are set. Remaining gaps:
+
+1. **From fixed** ✅ — `PlotLines@theplotline.net` (commit 5d36ebd)
+2. **Reply-To missing** — never wired up. Should be `support@theplotline.net` (or whatever the real support address is). Set `msg['Reply-To']` in `_send_one()` in `garden-mailer.py`. Add `SMTP_REPLY_TO` env var.
+3. **List-Unsubscribe header missing** — required by Gmail/Yahoo for bulk senders. Add to `_send_one()`:
+   ```python
+   msg['List-Unsubscribe'] = f'<{unsub_url}>, <mailto:unsubscribe@theplotline.net?subject=unsubscribe>'
+   msg['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click'
+   ```
+   The `unsub_url` is already built in `_build_html()` — needs to be passed through to `_send_one()`.
+
+**File:** `garden-mailer.py` — `_send_one()` and `_build_html()`
+**Status:** ⬜ TODO (Reply-To + List-Unsubscribe)
 
 ---
 
