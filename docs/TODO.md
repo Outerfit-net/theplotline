@@ -51,17 +51,7 @@
 **Status:** ⬜ TODO — blocking production readiness
 
 ### DEV2. Update runbook — badly out of date
-**Issue:** Runbook was written before: dispatch-step.py, two-mode DAG contract, --test-subs, --fresh, is_test column, new test organization, plotlines-agent skill. Needs a full rewrite.
-**Spec:**
-- Two production modes (cron / --fresh)
-- dispatch-step.py as the only testing interface
-- Test subscriber management (is_test flag)
-- How to run tests (individual suites + master runner)
-- Deploy workflow (once DEV1 is done)
-- Cron schedule and log location
-- Secrets management (Bitwarden)
-**File:** `/opt/plotlines/docs/RUNBOOK.md`
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — commit af29755
 
 ### DEV3. T5 — Reorganize Python test suite + master test runner
 **Issue:** Three monolithic test_pipeline*.py files — can't run individual suites without triggering LLM calls. No master runner.
