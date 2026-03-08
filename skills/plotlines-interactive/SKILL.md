@@ -17,6 +17,29 @@ Run any pipeline stage on demand. Show ALL raw output — never summarize, never
 - **Show full prompt** when asked — every word.
 - **Ask before sending real email.** Never send without explicit confirmation.
 
+## ⚠️ Test Rules
+**NEVER run the full test suite without explicit user permission.** LLM tests take 2+ minutes and spawn real agent calls.
+
+```bash
+# Safe default — fast only (no LLM, no network)
+python3 run_tests.py --fast          # all suites, ~4s
+
+# Single suite
+python3 run_tests.py art             # ~1s
+python3 run_tests.py seasons         # ~0.1s
+
+# With network (Postgres, NWS)
+python3 run_tests.py --network
+
+# With LLM (dialogue, masthead) — explicit permission required
+python3 run_tests.py --slow
+
+# Everything
+python3 run_tests.py --all-marks
+```
+
+**NEVER run `pytest test_pipeline*.py`** — those files are deleted. Use `run_tests.py` or `pytest tests/test_NAME.py::TestClass -v`.
+
 ## Setup
 
 ```bash
@@ -37,43 +60,146 @@ Show the full resolution output to the user — this is the first verification s
 
 All `--email EMAIL` flags in dispatch resolve via `email_hash` internally — same lookup.
 
-## Commands
+## Interactive Step-Through (recommended) — dispatch-step.py
+
+**"Run standalone"** always means `dispatch-step.py`. No exceptions.
+
+```bash
+STEP=/home/administrator/openclaw/skills/garden-conversation/dispatch-step.py
+```
+
+### Single stage (non-interactive) — the primary testing tool
+
+```bash
+# Run exactly one stage for one subscriber
+python3 $STEP --stage weather  --email EMAIL
+python3 $STEP --stage art      --email EMAIL
+python3 $STEP --stage dialogue --email EMAIL
+python3 $STEP --stage title    --email EMAIL
+python3 $STEP --stage masthead --email EMAIL
+python3 $STEP --stage email    --email EMAIL   # sends real email — confirm first
+
+# Bust only the cache for that stage, then run it
+python3 $STEP --stage art --email EMAIL --bust-cache
+
+# Test subscribers only (is_test=true in DB)
+python3 $STEP --stage art --test-subs
+```
+
+### Dependency rules — hard constraints, never skip
+- **weather** has no dependencies
+- **art** needs weather. If `weather_condition` is null → run weather first. Never fall back to `cloudy`.
+- **dialogue** needs weather. Art is NOT a dependency of dialogue.
+- **title** needs weather + zone/season
+- **masthead** needs art + title (weather+dialogue from cache)
+- **email** needs everything
+
+### Fresh full run (nuke all caches including art)
+```bash
+python3 $STEP --fresh                    # interactive confirmation, then full DAG
+python3 $STEP --fresh --test-subs        # test subs only
+```
+
+### Interactive walk-through
+```bash
+python3 $STEP --date $DATE --email EMAIL          # step through all stages
+python3 $STEP --from-stage art --email EMAIL      # start from a specific stage
+python3 $STEP --bust-cache --email EMAIL          # scoped bust then walk-through
+```
+
+### Cache bust scope
+`--bust-cache` without `--stage` clears: run dir + prose cache + mastheads (NOT art)
+`--bust-cache` with `--stage` clears only that stage's files:
+- weather → weather_*.json
+- art → art/generated/*.png + art/pil/*.png
+- dialogue → dialogue_*.json + prose-cache/*.json
+- masthead → mastheads/*.png composites
+
+`--fresh` clears everything including art (slow — ~60s/image to regenerate).
+
+### Test subscribers
+`is_test=true` in DB: mdcscry@yahoo.com, moltibot@agentmail.to, outerfit.net@gmail.com, mdcscry@gmail.com
+Production cron runs without `--test-subs`. Dev always uses `--test-subs` or `--email`.
+
+Show ALL output verbatim after each stage. Open images in browser. Never summarize.
+
+---
+
+## Commands (standalone — use dispatch-step.py --stage whenever possible)
+
+**Prefer `dispatch-step.py --stage STAGE --email EMAIL` over all of the below.**
+These are fallbacks for cases where you need finer control than dispatch-step provides.
 
 ### `run weather for EMAIL`
 ```bash
-python3 $DISPATCH --date $DATE --no-send \
-  --skip-dialogue --skip-art --skip-title --skip-masthead \
-  --email EMAIL 2>&1
+RESOLVED=$(python3 $RESOLVE EMAIL --date $DATE)
+ZIP=$(echo $RESOLVED | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['zipcode'] or '')")
+STATION=$(echo $RESOLVED | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['station_code'])")
+
+if [ -n "$ZIP" ]; then
+  python3 ~/openclaw/skills/garden-conversation/garden-weather.py --zip $ZIP --summarize 2>&1
+else
+  python3 ~/openclaw/skills/garden-conversation/garden-weather.py --station $STATION --summarize 2>&1
+fi
 ```
-Then immediately show the full raw weather JSON — every field, no truncation:
+Show ALL raw JSON — every field, no truncation.
+
+---
+
+### `run art for EMAIL`
+
+⚠️ **Weather is a required dependency for art. Always run weather first.**
+If `weather_condition` is null in resolve output — do NOT fall back to `cloudy`. Run weather first.
+
 ```bash
-cat /opt/plotlines/data/runs/$DATE/weather_STATION.json
+RESOLVED=$(python3 $RESOLVE EMAIL --date $DATE)
+ZONE=$(echo $RESOLVED | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['climate_zone_id'])")
+COND=$(echo $RESOLVED | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['weather_condition'] or '')")
+ZIP=$(echo $RESOLVED | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['zipcode'] or '')")
+STATION=$(echo $RESOLVED | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['station_code'])")
+
+# Step 1: Run weather if condition is missing
+if [ -z "$COND" ]; then
+  echo "weather_condition is null — running weather first"
+  if [ -n "$ZIP" ]; then
+    python3 ~/openclaw/skills/garden-conversation/garden-weather.py --zip $ZIP --summarize 2>&1
+  else
+    python3 ~/openclaw/skills/garden-conversation/garden-weather.py --station $STATION --summarize 2>&1
+  fi
+  # Re-resolve to pick up the condition
+  RESOLVED=$(python3 $RESOLVE EMAIL --date $DATE)
+  COND=$(echo $RESOLVED | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['weather_condition'] or 'cloudy')")
+fi
+
+# Step 2: Show prompt
+python3 ~/openclaw/skills/garden-conversation/generate_art.py $ZONE $COND --date $DATE --show-prompt
+
+# Step 3: Generate
+python3 ~/openclaw/skills/garden-conversation/generate_art.py $ZONE $COND --date $DATE 2>&1
 ```
-Show everything. The user reads it. Do not summarize, do not verify on their behalf.
+Show prompt. Generate. Open PNG in browser. Screenshot inline.
 
 ---
 
 ### `run dialogue for EMAIL`
 ```bash
-python3 $DISPATCH --date $DATE --no-send \
-  --skip-art --skip-title --skip-masthead \
-  --email EMAIL 2>&1
-```
-Then show the full raw dialogue JSON — every field, no truncation:
-```bash
-cat /opt/plotlines/data/runs/$DATE/dialogue_STATION_AUTHOR.json
-```
-Show everything. The user reads it. Do not summarize.
+RESOLVED=$(python3 $RESOLVE EMAIL --date $DATE)
+ZIP=$(echo $RESOLVED | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['zipcode'] or '')")
+STATION=$(echo $RESOLVED | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['station_code'])")
+AUTHOR=$(echo $RESOLVED | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['author_key'])")
+ZONE=$(echo $RESOLVED | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['climate_zone_id'])")
 
----
+if [ -n "$ZIP" ]; then
+  python3 ~/openclaw/skills/garden-conversation/garden-weather.py --zip $ZIP --summarize > /tmp/wx_$STATION.json 2>/dev/null
+else
+  python3 ~/openclaw/skills/garden-conversation/garden-weather.py --station $STATION --summarize > /tmp/wx_$STATION.json 2>/dev/null
+fi
 
-### `run art for EMAIL`
-```bash
-python3 $DISPATCH --date $DATE --no-send \
-  --skip-title --skip-masthead \
-  --email EMAIL 2>&1
+python3 ~/openclaw/skills/garden-conversation/garden-dialogue.py \
+  --weather-json /tmp/wx_$STATION.json \
+  --author $AUTHOR --zone $ZONE --output-json 2>&1
 ```
-Show full output. Then open the art PNG in browser and display the screenshot inline. The user looks at it.
+Show ALL output — full prose, every word.
 
 ---
 
@@ -101,13 +227,13 @@ Show full output. Then open the masthead URL in browser and display the screensh
 
 ---
 
-### `run full for EMAIL`
-Run all stages in order, pausing between each for "next" / "stop".
-Bust cache first if user says "uncached" or "from scratch":
+### `run full for EMAIL` / `fresh run`
 ```bash
-rm -rf /opt/plotlines/data/runs/$DATE \
-       /opt/plotlines/data/runs/$DATE-dry \
-       /opt/plotlines/data/prose-cache/$DATE
+# Preferred — interactive confirmation, nukes all caches including art
+python3 $STEP --fresh --email EMAIL
+
+# DAG directly with full cache bust
+python3 $DISPATCH --clear-cache --clear-art --date $DATE --email EMAIL --no-send
 ```
 
 ---
