@@ -273,9 +273,8 @@ Tests we need that don't exist:
 ---
 
 ### W3. Test subscribers missing zipcode
-**Partial fix:** AJK (99812) and BOU (80303/80308) backfilled. KEY/munro (outerfit.net@gmail.com) still has empty zipcode — needs 33040 backfilled.
-**Fix:** UPDATE subscribers SET zipcode = pgp_sym_encrypt('33040', KEY) WHERE email_hash = '3fb3596370aaac21aa72651ed9fe96215bf01543b13b0a81d3fb9b89a8cf6adf'
-**Status:** ⬜ TODO — one sub remaining (KEY/munro)
+**Fix:** All 4 backfilled — AJK/99812, BOU/80303+80308, KEY/33040.
+**Status:** ✅ DONE
 
 ---
 
