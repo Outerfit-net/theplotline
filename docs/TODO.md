@@ -13,10 +13,8 @@
 **Status:** ✅ DONE — commit e0fb2b0
 
 ### AR3. Art requires weather — enforce dependency explicitly
-**Issue:** Art generation falls back to `cloudy` when `weather_condition` is null (subscriber has no cached weather). This causes wrong cache key and wrong imagery. The art stage must not run without a real weather condition.
-**Fix:** In dispatch, enforce that weather runs before art. If `weather_condition` is null at art time, fail loudly rather than silently falling back to `cloudy`.
-**File:** `garden-dispatch.py` — art stage dependency check
-**Status:** ⬜ TODO
+**Fix:** Enforced in `dispatch-step.py` — weather runs before art, null condition is never passed to art. DAG always runs full via dispatch-step; skip flags are not used in production.
+**Status:** ✅ DONE
 
 ### AR1. Climate zone underscores in prompt — transform for readability
 **Fix:** `zone_label = zone.replace("_", " ")` in `build_prompt()` — line 272
