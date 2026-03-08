@@ -307,7 +307,7 @@ Tests we need that don't exist:
 
 ### T5. Modularize Python test suite — never run all tests at once
 **See DEV3 above — same item, tracked there with full spec.**
-**Status:** ⬜ TODO
+**Status:** ✅ DONE — duplicate of DEV3, completed commit 38dd2f7
 
 ### T4. Pre-flight checks — build into dispatch
 **Status:** ✅ DONE — commit `9b780df` — `_preflight()` checks DB, stale zones, Ollama, SMTP, NWS; hard-stops with Telegram alert on any error
