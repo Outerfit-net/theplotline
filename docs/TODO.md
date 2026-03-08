@@ -305,10 +305,6 @@ Tests we need that don't exist:
 - All 4 active subscribers receive email in dry-run — ✅ added (reads count from DB dynamically)
 **Status:** ✅ DONE — commit `ea61ca8` — `test_pipeline_t3.py` added, 16 tests (15 fast + 1 slow dispatch)
 
-### T5. Modularize Python test suite — never run all tests at once
-**See DEV3 above — same item, tracked there with full spec.**
-**Status:** ✅ DONE — duplicate of DEV3, completed commit 38dd2f7
-
 ### T4. Pre-flight checks — build into dispatch
 **Status:** ✅ DONE — commit `9b780df` — `_preflight()` checks DB, stale zones, Ollama, SMTP, NWS; hard-stops with Telegram alert on any error
 
