@@ -6,6 +6,11 @@
 
 ## 🔴 INFRASTRUCTURE — Dev Environment & CI/CD
 
+### OPS1. Verify daily DB backup to R2 is running
+**Verified 2026-03-08:** Cron fires at 2 AM daily. Last two runs successful — plotlines + thread DBs both pushed to R2. Restore not yet tested.
+**Remaining:** Test a restore from R2 before production launch.
+**Status:** ⬜ TODO — backup confirmed, restore untested
+
 ### DEV1. Create development environment + git workflow
 **Issue:** No dev environment exists. All work happens directly on production. Need a clean promotion path before this goes to real paying subscribers.
 **Spec:**
