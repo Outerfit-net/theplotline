@@ -4,6 +4,57 @@
 
 ---
 
+## 🟡 ART — Prompt Quality
+
+### AR1. Climate zone underscores in prompt — transform for readability
+**Issue:** `<climate_zone>florida_keys_tropical</climate_zone>` — underscores may confuse the model. Should be `florida keys tropical`.
+**Fix:** In `build_prompt()`, replace underscores with spaces before injecting zone into `<climate_zone>` tag.
+**File:** `generate_art.py: build_prompt()`
+**Status:** ⬜ TODO
+
+### AR2. Art styles library — comprehensive technique list for randomized prompt injection (NICE TO HAVE)
+**File:** `generate_art.py` — add `ART_STYLES` data structure
+**Spec:** Create a data structure containing the full style list below. In the prompt build process, randomly inject 3–4 techniques into `<style>`. Techniques could be interpolated or weighted by season.
+
+**Full style list:**
+- Watercolor (loose, detailed)
+- Pastel (oil pastel, pencil pastel, PanPastel)
+- Gouache
+- Colored pencil
+- Graphite
+- Silverpoint
+- Egg tempera
+- Acrylic
+- Oil
+- Charcoal
+- Minimalist line art
+- Abstract botanical
+- Block print (woodblock, woodcut, linocut, white-line woodcut, wood engraving)
+- Ukiyo-e
+- Ink print
+- Hand-drawn doodle
+- Risograph
+- Lithograph (chromolithograph, vintage lithograph)
+- Engraving
+- Photogram
+- Cyanotype
+- Stippling
+- Cross-hatching
+- Florilegium
+- Monograph illustration
+- Trompe l'oeil
+- Cel shading
+- L-system rendering
+- Halftoning
+- Impressionist
+- Expressionist
+- Gothic floral
+- Eco-printing
+
+**Status:** ⬜ NICE TO HAVE
+
+---
+
 ## 🔴 CRITICAL — App Correctness
 
 ### C1. Master Query — add climate_zone_id, hemisphere, lat, lon
@@ -162,6 +213,11 @@ Tests we need that don't exist:
 - Dispatch pre-flight: alerts if stale zone names in DB — ✅ added (via cursor mock)
 - All 4 active subscribers receive email in dry-run — ✅ added (reads count from DB dynamically)
 **Status:** ✅ DONE — commit `ea61ca8` — `test_pipeline_t3.py` added, 16 tests (15 fast + 1 slow dispatch)
+
+### T5. Modularize Python test suite — never run all tests at once
+**Issue:** Running `pytest test_pipeline*.py` hits the full pipeline including dialogue (2+ min, spawns LLM calls). Tests need to be modular so individual classes/modules can be run in isolation.
+**Fix:** Split into focused test files by module (test_art.py, test_weather.py, test_dialogue.py etc). Update SKILL.md for plotlines-agent and plotlines-interactive to explicitly forbid running the full pytest suite without permission.
+**Status:** ⬜ TODO
 
 ### T4. Pre-flight checks — build into dispatch
 **Status:** ✅ DONE — commit `9b780df` — `_preflight()` checks DB, stale zones, Ollama, SMTP, NWS; hard-stops with Telegram alert on any error
