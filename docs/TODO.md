@@ -208,3 +208,10 @@ Tests we need that don't exist:
 **Issue:** BOU/hemingway and KEY/munro subscribers have no zipcode because they were created directly in DB, bypassing the Stripe checkout webhook that backfills `postal_code` from Stripe billing address. The backfill code in `stripe.js` is correct but never fired.
 **Fix:** Manually backfill zipcodes for test subscribers: mdcscry@yahoo.com (80302), moltibot@agentmail.to (80302), outerfit.net@gmail.com (33040). Run UPDATE via admin or psql with encryption.
 **Status:** ⬜ TODO
+
+---
+
+### W4. wind_mph field may be pulling gust reading instead of sustained wind
+**Issue:** KEY station reported `wind_mph: 58.0` on 2026-03-07 while the NWS forecast text only mentioned 15–20 knots (~17–23 mph). The current observation field may be pulling a peak gust, not the sustained wind speed, from the NWS obs API.
+**Fix:** Check the NWS obs JSON field being used for `wind_mph` — if it's `windGust` or a combined field, switch to `windSpeed` (sustained). Add a sanity cap or warning if wind_mph > 50 mph and no storm/hurricane condition is present.
+**Status:** ⬜ TODO
