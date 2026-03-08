@@ -393,6 +393,49 @@ python3 run_tests.py --all
 
 ---
 
+## Email Delivery
+
+**Provider:** Resend via SMTP (`smtp.resend.com:465`)
+**Script:** `garden-mailer.py`
+**Config:** `/opt/plotlines/.env`
+
+### Addresses
+
+| Purpose | Address |
+|---------|---------|
+| From (sender) | `PlotLines@theplotline.net` |
+| Reply-To | `support@theplotline.net` |
+| No-reply | `noreply@theplotline.net` |
+| Beta | `beta@theplotline.net` |
+| Hello | `hello@theplotline.net` |
+| User (owner) | `mcryer@theplotline.net` |
+
+All addresses are real and route somewhere. `PlotLines@` is an alias to `support@`.
+
+### Headers set on every dispatch email
+
+```
+From:              PlotLines@theplotline.net
+Reply-To:          support@theplotline.net
+List-Unsubscribe:  <https://theplotline.net/unsubscribe?...>, <mailto:unsubscribe@theplotline.net?subject=unsubscribe>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+```
+
+**Note:** `List-Unsubscribe` header is not yet implemented — see EML1 in TODO.md.
+
+### Env vars
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `SMTP_FROM` | `PlotLines@theplotline.net` | Envelope + From header |
+| `SMTP_REPLY_TO` | `support@theplotline.net` | Reply-To header |
+| `SMTP_HOST` | `smtp.resend.com` | SMTP server |
+| `SMTP_PORT` | `465` | SSL port |
+| `SMTP_USER` | `resend` | Auth username |
+| `SMTP_PASS` | — | Resend API key (required) |
+
+---
+
 ## Backups
 
 **Script:** `/opt/plotlines/ops/backup-db.sh`
