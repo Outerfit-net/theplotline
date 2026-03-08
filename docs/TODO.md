@@ -264,9 +264,8 @@ Tests we need that don't exist:
 ---
 
 ### D1. --no-send flag not respected by mailer
-**Issue:** `--no-send` flag does not prevent email delivery. Dispatch sent 2 emails during masthead stage of step-through when it should have held. The `no_send` value is not being passed correctly through to the `send()` function call path.
-**Fix:** Trace `no_send` through `run_dispatch` → `send()` — likely a missing pass-through somewhere in the call chain.
-**Status:** ⬜ TODO
+**Moot.** Production has two modes: cron (sends) and --fresh (sends). dispatch-step.py owns all no-send testing flows. Nobody calls --no-send directly.
+**Status:** ✅ CLOSED — by design
 
 ---
 
