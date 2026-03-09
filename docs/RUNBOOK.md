@@ -65,6 +65,7 @@ python3 garden-dispatch.py --dry-run --clear-cache
 ### DAG stages (in order)
 1. preflight — DB, Ollama, SMTP, NWS reachability
 2. weather — NWS obs + forecast per station
+   - Note: do not synthesize observation station codes from office IDs (no `K+` prefixing). For office codes like `AJK`/`BOU`/`KEY`, use station as provided and rely on lat/lon nearest-station fallback when direct obs lookup fails.
 3. art + dialogue — parallel (art: SDXL; dialogue: multi-agent LLM)
 4. title — sekki + zone + condition lookup
 5. masthead — composite PNG (art + title + typography)

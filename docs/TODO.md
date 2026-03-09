@@ -33,6 +33,18 @@
 **Status:** ⬜ TODO
 
 
+### OPS2. Configure dispatch log rotation (daily + size cap)
+**Issue:** `/opt/plotlines/logs/dispatch.log` is currently unbounded (no logrotate rule found). File has already grown to ~1.3MB and will continue growing.
+**Fix:** Add `/etc/logrotate.d/plotlines-dispatch`:
+- target: `/opt/plotlines/logs/dispatch.log`
+- rotate `daily`
+- keep `14`
+- `compress` + `delaycompress`
+- `missingok`, `notifempty`, `copytruncate`
+- optional `size 200k` cap (or agreed threshold)
+Then run `logrotate -d` (dry run) and verify next rotation output.
+**Status:** ⬜ TODO
+
 ### OPS1. Verify daily DB backup to R2 is running
 **Verified 2026-03-08:** Cron fires at 2 AM daily. Last two runs successful — plotlines + thread DBs both pushed to R2. Restore not yet tested.
 **Remaining:** Test a restore from R2 before production launch.
