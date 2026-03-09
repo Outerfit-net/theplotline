@@ -65,6 +65,7 @@ It is absurdist. It is horticultural. It is oddly wise.
 | LLM (dialogue) | mistral:latest | — | Ollama local |
 | LLM (title) | mistral:latest | — | Ollama local, 30s timeout |
 | LLM (other) | gemma2, granite3.3, phi4:14b, qwen3.5 | — | Ollama local, character rotation |
+| LLM (pipeline) | See Pipeline Agents table | — | Dedicated agents per pipeline role |
 | Scheduling | OpenClaw cron | — | 5:30 AM Mountain daily |
 
 ---
@@ -110,6 +111,93 @@ Each character has a `persona-*.md` file in `~/openclaw/skills/garden-conversati
 | `herb-berryman` | Herb Berryman | — |
 | `muso-maple` | Muso Maple | 72 micro-seasons devotee |
 | `edie-bell` | Edie Bell | Black woman, ancestral soil knowledge, edible+bell pun |
+
+---
+
+## Pipeline Agents (as of 2026-03-09)
+
+The dialogue pipeline uses **dedicated OpenClaw agents** for each role, separate from the main/interactive agents. This prevents model fallback contamination and session pinning issues.
+
+### Cloud Agents (Anthropic primary → MiniMax fallback → local fallback)
+
+| Agent ID | Model | Role | Fallback Chain |
+|----------|-------|------|----------------|
+| `plotlines-orchestrator` | claude-sonnet-4-6 | Context generation (garden context prompt) | → MiniMax-M2.5 → qwen3.5:9b |
+| `plotlines-dialogue` | claude-haiku-4-5 | Raw dialogue refinement (first pass) | → MiniMax-M2.5 → qwen3.5:4b |
+| `plotlines-refiner` | claude-sonnet-4-6 | Author-style prose refinement (final pass) | → MiniMax-M2.5 → phi4:14b |
+
+### Local Agents (Ollama only — for local-mode dispatch)
+
+| Agent ID | Model | Role |
+|----------|-------|------|
+| `plotlines-orchestrator-local` | granite3.3:latest | Context generation |
+| `plotlines-dialogue-local` | qwen3.5:4b | Raw dialogue refinement |
+| `plotlines-refiner-local` | mistral:latest | Author-style prose refinement |
+
+### Local Model VRAM Reality (measured 2026-03-09)
+
+⚠️ **Disk size ≠ VRAM size.** Actual loaded VRAM is 2-7x larger than the model file on disk.
+
+| Model | Disk | Actual VRAM | Characters |
+|-------|------|-------------|------------|
+| qwen3.5:4b | 3.4 GB | **6.6 GB** | chelsea-flower, poppy-seed, esther-potts + dialogue-local |
+| llama3.2:3b | 2.0 GB | **7.0 GB** | miss-canthus, buster-native, fern |
+| mistral | 4.4 GB | **10.1 GB** | harry-kvetch, edie-bell + refiner-local |
+| granite3.3 | 4.9 GB | **12.9 GB** | ivy-league, herb-berryman + orchestrator-local |
+| phi3.5:3.8b | 2.2 GB | **16.0 GB** | buckthorn, muso-maple (**candidate for replacement — 16 GB for 3.8B params**) |
+
+**24 GB VRAM budget — what fits simultaneously:**
+- llama3.2 (7) + qwen3.5:4b (6.6) + mistral (10.1) = **23.7 GB** ✅
+- Any combo with phi3.5 (16 GB) or granite3.3 (12.9 GB) = max 1 other model
+- SD 1.5 art gen = ~4 GB additional — **run art separately, not in parallel with dialogue**
+
+### Performance Benchmarks (1 station, no art)
+
+| Config | Time |
+|--------|------|
+| 8 local models, cold load | 4:22 |
+| 5 local models, cold load | 4:28 |
+| 5 local models, smart pre-warm | **4:11** |
+| Cloud (Anthropic) | ~2:00 (when not rate-limited) |
+
+Smart pre-warm: after cast selection, `_prewarm_local_models()` loads only the models needed for chosen characters with `keep_alive=-1`.
+
+### Character Agents (12 characters, each has cloud + local variant)
+
+Each character agent (e.g., `buckthorn` / `buckthorn-local`) handles its own dialogue turns. These are separate from the pipeline agents above.
+
+### Switching Modes
+
+```bash
+# Cloud mode (default) — uses Anthropic via plotlines-* agents
+python3 garden-dispatch.py
+
+# Local mode — uses Ollama via plotlines-*-local agents
+python3 garden-dispatch.py --dialogue-agent-mode local
+
+# Test a single stage locally
+python3 dispatch-step.py --stage weather --email mdcscry@gmail.com --dialogue-agent-mode local
+```
+
+### Topic Selection (no LLM)
+
+Topic selection is **pure code** — no LLM call. `get_topic()` in `topic_bank_24.py` selects from a pre-built bank of topics keyed by solar term and climate zone, with DB-backed 14-day non-repeat tracking. To expand coverage:
+
+```bash
+python3 generate_topics.py --list-gaps                                          # show missing zone/term combos
+python3 generate_topics.py --zone mediterranean_eu --terms all                  # generate for a zone
+python3 generate_topics.py --zone high_plains --term "Pure Brightness" --agent-mode local  # use local models
+```
+
+### Design Principles
+
+1. **Pipeline agents are stateless** — prompt in, output out. No conversation context.
+2. **Interactive agents are contextful** — main agent keeps full session history. Switch models with `/model`, not agents.
+3. **Never share agents between pipeline and interactive work** — prevents sticky fallback contamination.
+4. **Each cloud agent has a full fallback chain** — Anthropic → MiniMax → local Ollama.
+5. **All pipeline + character agents have `tools.deny` set** — strips tool schemas from API calls. Without this, models without tool support (phi4, gemma2, glm4) fail with 400 errors. Pure chat = any Ollama model works.
+6. **Art gen should be decoupled from dialogue** — SD 1.5 needs ~4 GB VRAM. Run art first or as separate process, then run dialogue models.
+7. **Smart pre-warm** — `_prewarm_local_models()` in `garden-dialogue.py` loads only models needed for the randomly-selected cast, not all models.
 
 ---
 
@@ -322,6 +410,8 @@ ORDER BY
 | `garden_log.py` | Logging utilities | ✅ Active |
 | `topic_bank_24.py` | 24-term topic bank (current) | ✅ Active |
 | `garden-quotes.py` | Quote module | ⚠️ TODO |
+| `generate_topics.py` | Offline topic generation for zone/term combos | ✅ Active |
+| `dispatch-step.py` | Surgical pipeline stage tester | ✅ Active |
 | `garden-daily-v2.py` | Old monolithic script | 🗑️ Dead |
 | `garden-daily-v3.py` | Old monolithic script | 🗑️ Dead |
 | `garden-daily-single-email.py` | Dev/test tool | 🗑️ Dead |

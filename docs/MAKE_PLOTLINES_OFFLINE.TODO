@@ -1,0 +1,362 @@
+# MAKE_PLOTLINES_OFFLINE.TODO
+## Comprehensive Offline Model Migration for Plot Lines
+*Created: 2026-03-08*
+*Trigger: Anthropic access may be lost. All critical paths must work with local/offline models.*
+
+---
+
+## Executive Summary
+
+**Goal:** Every LLM call in the Plot Lines pipeline (dialogue, weather, prose refinement) must have a working offline fallback using local models (Ollama, etc.).
+
+**Timeline:** 2-3 weeks for full implementation + testing
+
+**Key constraint:** Character voice must survive the migration — Harry must still complain offline, Muso must still be terse, etc.
+
+---
+
+## Phase 1: Character Agent Duplication & Switching (1 week)
+
+### 1.1 Duplicate All 12 Character Agents
+
+**Current state:** 12 agents exist (one per character), defaulting to Anthropic models.
+
+**Action:** For each character, create an offline variant:
+- `buckthorn` → `buckthorn-offline` (default to gemma2 or equivalent)
+- `harry-kvetch-offline`, `miss-canthus-offline`, etc. × 12
+
+**Spec:**
+- Copy agent definition from OpenClaw config
+- Replace model: `anthropic/claude-*` → `ollama/gemma2` (or test best-fit per character)
+- Register all 12 in agent system
+- Test: each agent can be called and produces output
+
+**Files affected:**
+- `.openclaw/agent-definitions/` or wherever agents are registered
+- Documentation: list all 12 offline agents + their model assignments
+
+### 1.2 Add `--offline` Flag to garden-dialogue.py
+
+**Change:** Add CLI argument:
+```python
+parser.add_argument('--offline', action='store_true', 
+                    help='Use offline models instead of Anthropic')
+```
+
+**Logic:** In `run_dialogue()`, before calling characters:
+```python
+agent_suffix = "-offline" if args.offline else ""
+for aid, name, pf in chosen:
+    aid_to_use = aid + agent_suffix if args.offline else aid
+    call(aid_to_use, sids[aid_to_use], prompt, 90)
+```
+
+**Testing:**
+```bash
+# Online (current)
+python3 garden-dialogue.py --author hemingway
+
+# Offline
+python3 garden-dialogue.py --author hemingway --offline
+```
+
+**Success criteria:** Both produce valid dialogue; offline may be slower/shorter but must be coherent.
+
+---
+
+## Phase 2: Prose Refinement Offline (1 week)
+
+### 2.1 Haiku Pass Offline
+
+**Current:** `refine_to_prose()` calls Haiku for dialogue-to-prose rewrite.
+
+**Action:** Add conditional:
+```python
+def refine_to_prose(dialogue_text, author_key, offline=False):
+    ...
+    if offline:
+        h = call("haiku-offline", ..., h_prompt, 120)
+    else:
+        h = call("haiku", ..., h_prompt, 120)
+```
+
+**Model selection:** Test `ollama/gemma2` and `ollama/mistral` for compression task.
+
+**Spec:**
+- Create `haiku-offline` agent (if not already available)
+- Test output quality: no longer than Anthropic version, captures all character voice
+- Cache behavior: same cache key regardless of online/offline (they produce the same output)
+
+### 2.2 Sonnet Pass Offline
+
+**Current:** `refine_to_prose()` calls Sonnet for style rewrite (Hemingway/Munro/Gabaldon).
+
+**Action:** Add conditional:
+```python
+if offline:
+    s = call("sonnet-offline", ..., s_prompt, 120)
+else:
+    s = call("sonnet", ..., s_prompt, 120)
+```
+
+**Model selection:** Test `ollama/mistral` or `ollama/neural-chat` for literary style work.
+
+**Challenge:** Sonnet currently does heavy lifting on character voice preservation (which is failing). The offline version needs the **same voice preservation rules in the prompt** that should already be there but aren't.
+
+**Spec:**
+- Create `sonnet-offline` agent
+- Inject character voice rules into `s_prompt` (see Phase 3)
+- Test: offline output matches or exceeds Anthropic quality on voice preservation
+- Cache: same behavior as Haiku
+
+### 2.3 Update `refine_to_prose()` Signature
+
+**Change:**
+```python
+def refine_to_prose(dialogue_text, author_key, offline=False):
+    ...
+```
+
+**Propagate flag through pipeline:**
+- `garden-dispatch.py` passes `--offline` to `garden-dialogue.py`
+- `garden-dialogue.py` passes `offline=True` to `refine_to_prose()`
+
+---
+
+## Phase 3: Character Voice Preservation in Prompts (parallel with Phase 2)
+
+### 3.1 Extract Voice Signatures from Persona Files
+
+**Action:** Create a new function `extract_voice_signature(persona_text)`:
+
+```python
+def extract_voice_signature(persona_text):
+    """Extract core voice rules from persona SOUL file.
+    Returns a dict with key phrases like:
+    - complaint_style
+    - typical_length
+    - core_mannerisms
+    - speech_patterns
+    """
+    # Parse persona file for:
+    # - "Voice" section
+    # - "Core" section (name pun, core identity)
+    # - "Memory & Callbacks" (how they reference past)
+    # Return as dict
+```
+
+**Example for Harry Kvetch:**
+```python
+{
+    'name': 'Harry Kvetch',
+    'core_identity': 'Chronic complainer. Everything is wrong, always.',
+    'voice_style': 'Grumpy, dismissive, cynical. Short bursts. One or two complaints max per response.',
+    'speech_patterns': ['"Oh, let me tell you..."', 'Groans. Sighs. Eye rolls.'],
+    'typical_length': '1-2 sentences, complaint-focused',
+    'pun_style': 'OCCASIONAL bad puns involving "hairy vetch"'
+}
+```
+
+### 3.2 Inject Voice Rules into Character Prompts
+
+**Current issue:** Character prompts say "stay in character" but don't specify HOW.
+
+**Fix:** Update dialogue loop prompt to include extracted voice rules:
+
+```python
+voice_sig = extract_voice_signature(persona_text)
+prompt = f"""Today is {date_str}.
+You are ONLY {name}.
+...
+CHARACTER VOICE RULES:
+Core: {voice_sig['core_identity']}
+Voice: {voice_sig['voice_style']}
+Patterns: {', '.join(voice_sig['speech_patterns'][:3])}
+Typical length: {voice_sig['typical_length']}
+
+Rules: stay in character, 1-2 sentences, react to recent dialogue, no meta framing."""
+```
+
+### 3.3 Inject Voice Rules into Sonnet Refinement Prompt
+
+**Current problem:** Sonnet pass has no character voice constraints. Generic "distinct voices" rule fails.
+
+**Fix:** Pass character list + voice signatures to `refine_to_prose()`:
+
+```python
+def refine_to_prose(dialogue_text, author_key, characters=None, offline=False):
+    voice_rules = ""
+    if characters:
+        voice_rules = "\n\nCHARACTER VOICE PRESERVATION:\n"
+        for name, persona_file in characters:
+            sig = extract_voice_signature(readp(persona_file))
+            voice_rules += f"- {name}: {sig['voice_style']}\n"
+    
+    s_prompt = f"""Rewrite this prose in the style of {author_style['name']}.
+{author_style['style']}
+{voice_rules}
+..."""
+```
+
+**Testing:** Offline Sonnet pass must preserve Harry's complaints, Muso's terseness, etc.
+
+---
+
+## Phase 4: Weather Offline (1 week)
+
+### 4.1 NWS Data (Already Offline-Compatible)
+
+**Current:** `garden-weather.py` calls NWS API (external, not Anthropic).
+
+**Status:** No change needed — NWS doesn't require Anthropic models.
+
+### 4.2 AFD Summarization Offline
+
+**Current:** Uses Sonnet to summarize Area Forecast Discussion text.
+
+**Change:** In `garden-weather.py`, add `--offline` flag:
+
+```python
+parser.add_argument('--offline', action='store_true',
+                    help='Use offline model for AFD summarization')
+
+if args.summarize:
+    if args.offline:
+        afd_summary = call("sonnet-offline", ..., summarize_prompt, 60)
+    else:
+        afd_summary = call("sonnet", ..., summarize_prompt, 60)
+```
+
+**Testing:** Offline AFD summary should be comparable length and accuracy.
+
+---
+
+## Phase 5: Integration & Testing (1 week)
+
+### 5.1 End-to-End Offline Dispatch
+
+**Test path:**
+```bash
+cd /home/administrator/openclaw/skills/garden-conversation
+
+# Full offline dispatch
+python3 dispatch-step.py --offline --email mdcscry@yahoo.com --stage weather
+python3 dispatch-step.py --offline --email mdcscry@yahoo.com --stage dialogue
+python3 dispatch-step.py --offline --email mdcscry@yahoo.com --stage art
+python3 dispatch-step.py --offline --email mdcscry@yahoo.com --stage masthead
+```
+
+**Success criteria:**
+- Each stage completes without Anthropic calls
+- Dialogue contains character-specific voice
+- Prose refinement preserves character voice
+- Final output is coherent and usable
+
+### 5.2 Comparative Testing (Offline vs Online)
+
+**Test matrix:**
+| Stage | Online model | Offline model | Quality parity? | Voice preservation? |
+|-------|---|---|---|---|
+| Dialogue (Harry) | claude-sonnet | gemma2 | | |
+| Dialogue (Muso) | claude-sonnet | gemma2 | | |
+| Haiku refinement | claude-haiku | gemma2/mistral | | |
+| Sonnet refinement | claude-sonnet | mistral/neural-chat | | |
+| AFD summary | claude-sonnet | mistral/neural-chat | | |
+
+**Run same 5 test cases online and offline, compare:**
+- Word count
+- Character voice (qualitative)
+- Tone preservation
+- Error rates
+
+### 5.3 Fallback Logic (Optional Phase 5b)
+
+**If offline quality is marginal:** Add graceful fallback:
+```python
+try:
+    result = call("character-offline", ..., prompt, 90)
+    if looks_empty_or_bad(result):
+        result = call("character", ..., prompt, 90)  # fallback to online
+except:
+    result = call("character", ..., prompt, 90)
+```
+
+**Decision:** Only implement if offline models consistently underperform.
+
+---
+
+## Phase 6: Documentation & Deployment (few days)
+
+### 6.1 Update RUNBOOK.md
+
+Add section:
+```markdown
+## Offline Mode
+
+When Anthropic models are unavailable, use `--offline` flag:
+
+```bash
+python3 dispatch-step.py --offline --stage dialogue --email mdcscry@yahoo.com
+python3 garden-dispatch.py --offline --dry-run
+```
+
+Model assignments:
+- Characters: gemma2
+- Haiku (dialogue refinement): gemma2 or mistral
+- Sonnet (prose refinement): mistral or neural-chat
+- AFD summary: mistral
+```
+
+### 6.2 Update Architecture Doc
+
+Add section on offline pipeline + model assignments.
+
+### 6.3 Create OFFLINE_MODELS.md
+
+Technical reference:
+- Model selection rationale per stage
+- Performance benchmarks (latency, quality)
+- Fallback logic
+- Troubleshooting
+
+---
+
+## Implementation Checklist
+
+- [ ] Phase 1.1: Duplicate 12 character agents with offline models
+- [ ] Phase 1.2: Add `--offline` flag to `garden-dialogue.py`
+- [ ] Phase 1: Test character agents (online vs offline comparison)
+- [ ] Phase 2.1: Implement Haiku-offline, add conditional
+- [ ] Phase 2.2: Implement Sonnet-offline, add conditional
+- [ ] Phase 2.3: Propagate `offline` flag through pipeline
+- [ ] Phase 3.1: Create `extract_voice_signature()` function
+- [ ] Phase 3.2: Inject voice rules into character prompts
+- [ ] Phase 3.3: Inject voice rules into Sonnet refinement
+- [ ] Phase 3: Test character voice preservation (offline)
+- [ ] Phase 4.2: Add `--offline` to `garden-weather.py` AFD summary
+- [ ] Phase 5.1: End-to-end offline dispatch test
+- [ ] Phase 5.2: Comparative testing (online vs offline)
+- [ ] Phase 5.3: Implement fallback logic (if needed)
+- [ ] Phase 6: Update docs + create OFFLINE_MODELS.md
+
+---
+
+## Open Questions for Codex
+
+1. **Model selection:** Should each character get a character-specific model, or is gemma2 universal?
+2. **Sonnet replacement:** Is mistral the best choice for literary prose, or should we test neural-chat?
+3. **Voice preservation:** How much does offline model quality degrade without fine-tuning? Do we need LoRAs per character?
+4. **Fallback strategy:** Should we implement graceful fallback or assume offline is "good enough"?
+5. **Caching:** Should offline + online use the same cache (assume same output) or separate caches?
+
+---
+
+## Related TODOs
+
+- **CH3:** Character voice drift during prose refinement (fixed by Phase 3)
+- **EML1:** List-Unsubscribe header (separate, lower priority)
+- **DEV1:** Dev environment + git workflow (can wait)
+
+---
+
+*End MAKE_PLOTLINES_OFFLINE.TODO*
