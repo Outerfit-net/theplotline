@@ -293,6 +293,19 @@ Then run `logrotate -d` (dry run) and verify next rotation output.
 
 ---
 
+### EML2. Duplicate email protection — idempotent sends per (subscriber, run_date)
+**Issue:** When dispatch re-runs for the same date (e.g. after a fix), subscribers who already received an email get it again. The mailer doesn't check if a delivery already exists for that subscriber+date before sending.
+**Fix:** Before sending, check `deliveries` table for existing `(subscriber_id, daily_run_id)` with `status='sent'`. Skip if found. This makes re-runs safe.
+**Status:** ⬜ TODO
+
+### ZONE1. Hawaii topic/solar term mismatch — tropical zones getting temperate topics
+**Issue:** Hawaii (HFO) got "Brassica hardening off — how cold is too cold for overnight exposure?" with references to 32-40°F. It's never been 32° in Hawaii. The solar term system assigned "Pure Brightness" with a -30d offset, but the term's description and associated topics are written for temperate climates. The weather data was correct (72-81°F) but the topic selection ignored it.
+**Root cause:** Solar term descriptions in `garden_seasons.py` are temperate-centric. Topic selection from `topic_bank_24.py` doesn't filter by zone climate type. Tropical, desert, and subtropical zones need different topic pools or at minimum a zone-climate filter on topic selection.
+**Fix:** Either (a) add zone-aware topic filtering (skip frost/cold topics for tropical zones), (b) create separate topic banks for tropical/desert/temperate, or (c) pass weather data into topic selection so it never picks "hardening off brassicas" when it's 80°F.
+**Status:** ⬜ TODO
+
+---
+
 ### W4. Weather pipeline makes unnecessary failing 3-letter station call before succeeding with 4-letter
 **Issue:** Weather fetch first tries the 3-letter station code (e.g. `BOU`), gets an error, then falls back to the 4-letter variant (e.g. `KBOU`) and succeeds. The initial failure is expected behavior but generates noisy error logs and wastes a request on every fetch.
 **Fix:** Determine the correct station format upfront — either always use the 4-letter format, or check the NWS points response for the canonical station identifier and cache it. Eliminate the retry-on-error pattern.
@@ -330,29 +343,80 @@ Then run `logrotate -d` (dry run) and verify next rotation output.
 
 **Prior work:** This was discussed before but bailed due to grain issues. The grain issue is solved — zone IS in the GROUP BY now. The blocker is gone.
 
-**First step (easy, do anytime):** Run 80-100 US cities through `assignClimateZone()` and eyeball the results. Flag anything a gardener would call wrong. Output a table: city, lat/lon, assigned zone, expected zone, notes. That list drives the new zone definitions.
+**The data integrity check:**
+There are 122 NWS Weather Forecast Offices (WFOs) in the US. Each WFO has a primary city. These are the actual grain of our weather data — every subscriber maps to a WFO via `station_code`. The check is:
+1. Get all 122 WFO primary cities + lat/lon
+2. Run each through `assignClimateZone()` 
+3. Eyeball: does this city belong in the zone it got assigned to? A gardener in Boise would laugh at "pacific_maritime."
+4. Flag mismatches → these tell us where bounding boxes need adjustment or new zones need to be created
+
+**Why WFO level, not sub-station level:**
+There are thousands of observation stations in the US. The cross product of thousands of stations × 15+ authors = too many potential dialogues to generate. The newsletter grain is `(WFO station_code, author)`, so the zone assignment only needs to be correct at WFO resolution. If Boise WFO maps to the right zone, every subscriber under that WFO gets the right content.
+
+**The dream (someday):** Sub-region level dialogue — each sub-station gets its own micro-local content. Requires massive parallelism (hundreds of concurrent dialogues). Not today. But the zone/sub-region data model is already designed to support it when the hardware catches up.
+
+**First step (easy, do anytime):** Pull the 122 WFO list (NWS API or Wikipedia), run each through `assignClimateZone()`, output a table: WFO code, city, lat/lon, assigned zone, expected zone, notes. That table drives all fixes — bounding box adjustments, new zone definitions, and the confidence that every subscriber in the country gets the right garden content.
 
 **Status:** ⬜ TODO
 
 ---
 
-### ARCH1. Decouple dispatch into per-combo jobs
-**Issue:** Current dispatch is a monolith — one run loops all combos sequentially. If one combo is slow or fails, it blocks or affects all others. Weather/dialogue/art/title/masthead/assemble/send all happen in one giant function.
-**Vision:** Each `(station, author)` combo should be an independent job:
-1. Scheduler fires at 5:30 AM → creates N jobs (one per combo)
-2. Each job runs its own full pipeline: weather → dialogue → art → title → masthead → assemble → send
-3. Jobs are independent — failure in one doesn't affect others
-4. Email sends as soon as that job's pipeline completes (first email at 5:35, not 6:15)
-5. Retry/failure tracking is per-job
-6. Parallelism is natural — run 3 dialogue jobs concurrently (VRAM limit), each fires its own email on completion
-**Benefit:** Subscribers get emails faster, failures are isolated, easier to debug per-combo, scales to 100+ combos without 5-hour sequential runs.
+### ARCH1. Modular pipeline — decouple stages, then assemble
+**Issue:** Current dispatch is a monolith — one function loops all combos through all stages sequentially. Slow dialogue blocks art. Failed weather blocks everything. Stages that don't depend on each other still run in series.
+
+**Vision — three decoupled phases, then assemble:**
+
+**Phase 1: Weather + Art (parallel, no dependencies on each other)**
+- Run ALL weather fetches for all stations (fast, network I/O only)
+- Run ALL art generation for all zone/condition combos (GPU, ~3s each)
+- These two can run simultaneously — art doesn't need weather, weather doesn't need art
+- Can even run on a schedule BEFORE 5:30 AM (weather at 5:00, art overnight)
+
+**Phase 2: Dialogue (the bottleneck — sequential per combo, parallelizable across combos)**
+- Run ALL dialogues for all combos
+- Each dialogue is independent — Tucson/McCarthy doesn't need Portland/Carver
+- Parallelize across combos: `Pool(3)` workers hitting different Ollama models concurrently
+- Within a combo, turns are sequential (turn 5 needs turn 4), can't parallelize
+
+**Phase 3: Assemble + Send (fast, depends on phases 1+2)**
+- For each combo: title → masthead (composites art + title) → assemble HTML → send email
+- Only runs when that combo's weather + art + dialogue are all done
+- Email sends per-combo as soon as its assembly completes (first email lands early)
+
 **Implementation:** Postgres job queue (no external deps):
-- `dispatch_jobs` table: `id, combo_key, run_date, status, started_at, finished_at, error, retry_count`
-- Cron at 5:30 AM → INSERT one row per active combo (status=pending)
-- Worker script: `pool(3)` → each worker grabs next pending job → runs full pipeline for that combo → sends email → marks done
+- `dispatch_jobs` table: `id, combo_key, run_date, phase, status, started_at, finished_at, error, retry_count`
+- Cron at 5:00 AM → weather + art jobs (phase 1)
+- Cron at 5:30 AM → dialogue jobs (phase 2), then assembly (phase 3)
+- Worker script: `pool(3)` → each worker grabs next pending job → marks done
 - Failed jobs get retried (max 3). No combo blocks another.
 - ~200 lines of new code. No Airflow, no Celery, no Redis.
+
+**Parallelism notes:**
+- Ollama handles concurrent requests natively — queues per model, no extra VRAM
+- 3 different models loaded = 3 truly concurrent inferences on GPU
+- Same model: serializes by default (`OLLAMA_NUM_PARALLEL=1`), can bump to 2 (trades VRAM for throughput)
+- Concurrency won't scale linearly on shared GPU — expect 1.5-2x, not 3x
+- Test: benchmark serial vs 3-parallel on current hardware before committing
+
 **Status:** ⬜ TODO (architectural — plan before building)
+
+### AR3. Art model bakeoff — test alternative image models
+**Issue:** Currently using SD 1.5 only. Other models may produce better botanical art for the masthead.
+**Plan:** Run the same zone/condition/term prompts through multiple models side-by-side and compare.
+**Candidates:**
+1. **SD 1.5** (current) — 2.6s gen, flat botanical style, ~4GB VRAM
+2. **SD 3.5 Medium** (2.5B params, ~5GB disk, ~10GB VRAM) — major quality jump, good composition. Download: `huggingface-cli download stabilityai/stable-diffusion-3.5-medium`. Needs HF license acceptance first. Optional fp8 text encoder variant from Comfy-Org saves more VRAM.
+3. **FLUX.2 Klein 4B** (~8GB disk, ~13GB VRAM) — good A/B test partner for SD 3.5 Medium. Also needs HF license acceptance.
+4. SDXL, Flux-schnell (already tried)
+**Pre-req:** Accept HuggingFace licenses for SD 3.5 Medium and FLUX.2 Klein before downloading.
+**Goal:** Find the best style-per-VRAM-dollar for flat illustrated botanical art. May end up using different models for different zones.
+**Status:** ⬜ TODO
+
+### T1. Titles are too long — make them pithier
+**Issue:** Current title generation produces newspaper-style names like "The Equinox's Golden Window Herald" or "The Held Breath Chronicle Sentinel" — too many words, too pompous. A good newsletter title should be 3-5 words max, punchy, evocative.
+**Examples of what we want:** "Frost Bites Back" / "Mud Season" / "The Last Snow" / "First Bee Report"
+**Fix:** Tighten the title generation prompt. Fewer words, more punch. Drop the "The X Y Z Herald/Sentinel/Tribune" formula. Let the author voice come through in the title itself, not just the font.
+**Status:** ⬜ TODO
 
 ---
 
