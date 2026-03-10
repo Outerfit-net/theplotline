@@ -65,6 +65,42 @@ Then run `logrotate -d` (dry run) and verify next rotation output.
 ### DEV2. Update runbook — badly out of date
 **Status:** ✅ DONE — commit af29755
 
+### DEV7. AgentDoor — make theplotline.net agent-friendly
+**Issue:** AI agents can't discover, authenticate, or subscribe to Plot Lines programmatically. No `/.well-known/` discovery, no headless auth flow, no agent-native onboarding.
+**Solution:** Integrate [AgentDoor](https://0xaron.github.io/agentdoor/) — drop-in middleware (Express/Fastify/Next.js) that adds:
+- `/.well-known/agentdoor.json` — auto-discovery of API capabilities, scopes, pricing
+- Ed25519 challenge-response auth — no browser, no CAPTCHA, <500ms onboarding
+- Scoped API access — agents can subscribe, read newsletters, manage preferences
+- Optional x402 payment protocol (USDC) for paid tiers
+**Why:** Agent-to-agent commerce is coming. Plot Lines should be subscribable by AI agents, not just humans. This also opens up API-first integrations (RSS readers, aggregators, other agents).
+**Package:** `npm install @agentdoor/express` (MIT licensed, TypeScript + Python)
+**Status:** ⬜ TODO
+
+### DEV4. Website copy refresh — How It Works + About pages
+**Issue:** Product and pipeline evolved (local-first dispatch, single-pass refine, richer author/station matrix), but website marketing pages still reflect older flow.
+**Fix:** Update `/how-it-works` and `/about` to match current architecture and voice.
+**Status:** ⬜ TODO
+
+### DEV5. Manage subscription link is broken
+**Issue:** "Manage subscription" link in email footer navigates to a broken page.
+**Fix:** Repair/manage route and token handling for `/manage?email=...&token=...`; validate end-to-end from received email click.
+**Status:** ⬜ TODO
+
+### DEV5b. Website admin page stats not rendering
+**Issue:** Admin dashboard stats section fails to render.
+**Fix:** Debug admin stats API + frontend binding/render path; validate with live data.
+**Status:** ⬜ TODO
+
+### DEV6. Plotlines agent docs/tooling sync with dispatch-step UX
+**Issue:** `dispatch-step.py` gained `--yes` and `--send-test`, but Plot Lines operator docs/checklists still need full sync and examples.
+**Fix:** Update Plot Lines agent docs/runbook snippets so testing + send workflows use new flags consistently.
+**Status:** ⬜ TODO
+
+### OPS3. ACP harness reliability for TUI/Telegram workflows
+**Issue:** ACP one-shot runs are accepted but no payload has surfaced; thread-bound ACP requires thread binding unavailable on webchat. Need clear supported-path doc and health check for TUI-first usage.
+**Fix:** Validate ACP path on TUI session, document supported/unsupported surfaces, and add a repeatable ACP health-check command set.
+**Status:** ⬜ TODO
+
 ### DEV3. T5 — Reorganize Python test suite + master test runner
 **Issue:** Three monolithic test_pipeline*.py files — can't run individual suites without triggering LLM calls. No master runner.
 **Spec:**
