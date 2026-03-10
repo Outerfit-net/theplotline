@@ -73,6 +73,21 @@ const AUTHOR_PROFILES = {
     name: 'George Saunders',
     style: 'warm, comic, humanist',
     example: ['The Sweet Stumble', 'Funny Turning', 'Love Breaking Through']
+  },
+  vonnegut: {
+    name: 'Kurt Vonnegut',
+    style: 'deadpan, absurdist, winking at the reader',
+    example: ['So It Thaws', 'The Last Frost Report', 'Unstuck in Spring']
+  },
+  robbins: {
+    name: 'Tom Robbins',
+    style: 'lush, digressive, sensual, counterculture wisdom',
+    example: ['The Tomato Conspiracy', 'Still Life with Compost', 'Jitterbug Perfume of Soil']
+  },
+  leguin: {
+    name: 'Ursula K. Le Guin',
+    style: 'mythic, anthropological, Taoist patience, nature as political',
+    example: ['The Ones Who Walk Away from Winter', 'A Wizard of Earthworms', 'The Dispossessed Garden']
   }
 };
 

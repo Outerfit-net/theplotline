@@ -91,6 +91,11 @@ Then run `logrotate -d` (dry run) and verify next rotation output.
 **Fix:** Debug admin stats API + frontend binding/render path; validate with live data.
 **Status:** ⬜ TODO
 
+### DEV5c. Stress test matrix — seed 11 new test subscribers before morning run
+**Issue:** Need realistic load spread to validate behavior under stress.
+**Spec:** Add `outerfit.net+test5@gmail.com` through `outerfit.net+test15@gmail.com` as test subscribers with distinct stations/zip codes/authors (plus existing 4), then run morning local dispatch and review outcomes.
+**Status:** ⬜ TODO (next action after compaction)
+
 ### DEV6. Plotlines agent docs/tooling sync with dispatch-step UX
 **Issue:** `dispatch-step.py` gained `--yes` and `--send-test`, but Plot Lines operator docs/checklists still need full sync and examples.
 **Fix:** Update Plot Lines agent docs/runbook snippets so testing + send workflows use new flags consistently.
@@ -288,9 +293,66 @@ Then run `logrotate -d` (dry run) and verify next rotation output.
 
 ---
 
+### W4. Weather pipeline makes unnecessary failing 3-letter station call before succeeding with 4-letter
+**Issue:** Weather fetch first tries the 3-letter station code (e.g. `BOU`), gets an error, then falls back to the 4-letter variant (e.g. `KBOU`) and succeeds. The initial failure is expected behavior but generates noisy error logs and wastes a request on every fetch.
+**Fix:** Determine the correct station format upfront — either always use the 4-letter format, or check the NWS points response for the canonical station identifier and cache it. Eliminate the retry-on-error pattern.
+**File:** Weather fetch logic in `garden-dispatch.py` or the weather service it calls
+**Status:** ⬜ TODO
+
+---
+
 ### W1. Condition bucket not zip-specific
 **Closed by design.** Weather grain is per-station, matching the newsletter edition grain `(station, author)`. Per-zip weather would require per-subscriber art and titles, blowing up the GROUP BY. The AFD narrative gives dialogue plenty of local texture. Early desire, superseded by architecture.
 **Status:** ✅ CLOSED — by design
+
+---
+
+## 🔴 INFRASTRUCTURE — Climate Zone Accuracy
+
+### GEO1. Promote sub-regions to first-class zones where climate actually differs
+**Issue:** The 16 US zones are too coarse. Sub-regions were designed to carry local nuance but they're just prompt flavor text — not part of the pipeline grain (GROUP BY, season offsets, topic bank, art). This means fundamentally different growing climates get the same newsletter content.
+
+**Known misclassifications:**
+- **Bend, OR / Boise, ID** → `pacific_maritime` (should be intermountain/high desert — 10" rain vs Portland's 40")
+- **Billings, MT** → `high_plains` (should be northern Rockies/Montana rangeland — not the same as Boulder/Denver Front Range)
+- Likely more: eastern WA (Spokane, Yakima), eastern OR, northern NV/UT edges
+
+**Root cause:** Sub-regions were the intended solution but got stuck at the flavor-text level due to grain issues. The master query GROUP BY is `(station_code, zipcode, author_key, climate_zone_id, hemisphere)` — zone is part of the grain, sub-region is not. Promoting sub-regions to zones means each gets its own weather context, season offsets, topic bank, and art subjects.
+
+**Fix — promote where needed:**
+1. Identify sub-regions where the climate genuinely differs from parent zone (not just local color)
+2. Create new `climate_zones` rows for each (e.g. `intermountain_west`, `northern_rockies`)
+3. Add zone rules in `climate.js` ZONE_RULES (ordered correctly — first match wins)
+4. Add season offsets in `garden_seasons.py` ZONE_OFFSETS
+5. Add topic bank entries
+6. Migrate affected subscribers + combinations to new zones
+7. Sub-regions that DON'T need promotion stay as prompt flavor (e.g. "Front Range" vs "Western Slope" within `high_plains` may be fine)
+
+**Prior work:** This was discussed before but bailed due to grain issues. The grain issue is solved — zone IS in the GROUP BY now. The blocker is gone.
+
+**First step (easy, do anytime):** Run 80-100 US cities through `assignClimateZone()` and eyeball the results. Flag anything a gardener would call wrong. Output a table: city, lat/lon, assigned zone, expected zone, notes. That list drives the new zone definitions.
+
+**Status:** ⬜ TODO
+
+---
+
+### ARCH1. Decouple dispatch into per-combo jobs
+**Issue:** Current dispatch is a monolith — one run loops all combos sequentially. If one combo is slow or fails, it blocks or affects all others. Weather/dialogue/art/title/masthead/assemble/send all happen in one giant function.
+**Vision:** Each `(station, author)` combo should be an independent job:
+1. Scheduler fires at 5:30 AM → creates N jobs (one per combo)
+2. Each job runs its own full pipeline: weather → dialogue → art → title → masthead → assemble → send
+3. Jobs are independent — failure in one doesn't affect others
+4. Email sends as soon as that job's pipeline completes (first email at 5:35, not 6:15)
+5. Retry/failure tracking is per-job
+6. Parallelism is natural — run 3 dialogue jobs concurrently (VRAM limit), each fires its own email on completion
+**Benefit:** Subscribers get emails faster, failures are isolated, easier to debug per-combo, scales to 100+ combos without 5-hour sequential runs.
+**Implementation:** Postgres job queue (no external deps):
+- `dispatch_jobs` table: `id, combo_key, run_date, status, started_at, finished_at, error, retry_count`
+- Cron at 5:30 AM → INSERT one row per active combo (status=pending)
+- Worker script: `pool(3)` → each worker grabs next pending job → runs full pipeline for that combo → sends email → marks done
+- Failed jobs get retried (max 3). No combo blocks another.
+- ~200 lines of new code. No Airflow, no Celery, no Redis.
+**Status:** ⬜ TODO (architectural — plan before building)
 
 ---
 

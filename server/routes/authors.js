@@ -46,7 +46,8 @@ async function authorRoutes(fastify) {
           { key: 'saunders', name: 'George Saunders', description: 'Satirical warmth' },
           { key: 'vonnegut', name: 'Kurt Vonnegut', description: 'So it goes' },
           { key: 'robbins', name: 'Tom Robbins', description: 'Lush, digressive, sensual' },
-          { key: 'gabaldon', name: 'Diana Gabaldon', description: 'Romantic, historically grounded' }
+          { key: 'gabaldon', name: 'Diana Gabaldon', description: 'Romantic, historically grounded' },
+          { key: 'leguin', name: 'Ursula K. Le Guin', description: 'Mythic, anthropological, Taoist patience' }
         ]
       });
     }

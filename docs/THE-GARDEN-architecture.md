@@ -1008,6 +1008,7 @@ OUT: {
 ```
 Script: `generate_masthead.py`
 Note: masthead hash must include title — stale mastheads with wrong titles must not be reused
+Note: `author_key` selects the title font via `AUTHOR_FONTS` dict in `generate_masthead.py`. Each author maps to a distinct typeface (e.g. hemingway → Spectral-Bold, mccarthy → Cinzel-Bold). Falls back to `Lora-Regular.ttf` for unmapped authors. Fonts live in `/opt/plotlines/fonts/commercial/`.
 
 ---
 

@@ -296,6 +296,9 @@ AUTHOR_FONTS = {
     "oconnor":    "Cinzel-Regular.ttf",
     "hurston":    "Caveat-Bold.ttf",
     "saunders":   "Caveat-Regular.ttf",
+    "vonnegut":   "Spectral-Regular.ttf",
+    "robbins":    "PlayfairDisplay-Italic.ttf",
+    "leguin":     "CormorantGaramond-Bold.ttf",
     "default":    "Lora-Regular.ttf",
 }
 

@@ -17,7 +17,7 @@ const DISPATCH_SCRIPT = path.join(
 function runPythonDispatch() {
   return new Promise((resolve, reject) => {
     console.log('[cron] Spawning garden-dispatch.py...');
-    const proc = spawn('python3', [DISPATCH_SCRIPT], {
+    const proc = spawn('python3', [DISPATCH_SCRIPT, '--dialogue-agent-mode', 'local'], {
       env: { ...process.env },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
