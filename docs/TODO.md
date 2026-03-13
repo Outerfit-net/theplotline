@@ -401,8 +401,11 @@ There are thousands of observation stations in the US. The cross product of thou
 - Assemble HTML: title → masthead composite → prose → template → send
 - Input: prose JSON + art PNG + subscriber list
 - Output: sent emails + delivery log
-- Per-combo as soon as its inputs are ready (first email lands early)
-- Failed sends retry independently
+- **Streams as pieces land.** Doesn't wait for all combos to finish.
+- Art is cached from stage 1. As each combo's refinement completes → assemble → send immediately.
+- First subscriber gets email while later combos are still refining.
+- No GPU needed — pure CPU/network. Can overlap with refinement stage.
+- Failed sends retry independently per subscriber.
 
 **Dependency graph:**
 ```
