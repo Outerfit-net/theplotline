@@ -385,7 +385,10 @@ There are thousands of observation stations in the US. The cross product of thou
 - Input: raw dialogue JSON
 - Output: `prose_{station}_{author}.json` (final prose text)
 - Currently baked into dialogue script — extract as standalone
-- Can use different model than dialogue (dolphin-llama3:8b for literary rewrite)
+- **Gets one big model, full GPU.** Flush dialogue models first.
+- This is the most sophisticated task — literary voice, prose craft, character preservation
+- Candidate: dolphin-llama3:8b now, but could be phi4:14b or a 13B+ model with full 24GB available
+- Runs serial across combos (one model, one GPU) — but each refinement is fast (~10-20s)
 
 **Stage 4: ART** (no dependencies — can run overnight)
 - Generate masthead art for each (zone, condition) combo
