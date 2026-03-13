@@ -408,12 +408,27 @@ WEATHER ──→ DIALOGUE ──→ REFINEMENT ──→ EMAIL
 ART ──────────────────────────────────────┘
 ```
 
+**DAG orchestration:**
+- Each stage is a standalone CLI: `python3 dispatch-stage.py --stage weather --all`
+- DAG runner checks inputs exist before launching each stage
+- Stages fire as soon as dependencies are met — no waiting for unrelated work
+- `--combo BOU/hemingway` for single-combo runs, `--all` for full dispatch
+- Failed stages retry independently. No combo blocks another.
+
+**GPU exclusivity — ART gets the whole GPU:**
+- Art generation (SD 1.5 / SD 3.5 / FLUX) needs dedicated VRAM — no Ollama models loaded
+- DAG must enforce: **unload all Ollama models before art, reload after**
+- Sequence: Weather → Art (GPU exclusive) → Dialogue (Ollama loads) → Refinement → Email
+- Or: Art runs overnight/pre-dawn when Ollama is idle. Cache by (zone, condition, term).
+- `curl -s http://localhost:11434/api/generate -d '{"model":"X","keep_alive":0}'` to flush before art
+- Future: if art models get small enough (SD 3.5 Medium ~10GB), could coexist with 1 small Ollama model
+
 **Implementation:** Postgres job queue (no external deps):
 - `dispatch_jobs` table: `id, combo_key, run_date, stage, status, started_at, finished_at, error, retry_count`
-- Each stage checks its inputs exist before running
-- `python3 dispatch-stage.py --stage weather --all` / `--stage dialogue --combo BOU/hemingway`
-- Orchestrator script kicks stages in order, but each stage is a standalone CLI
-- Failed jobs retry independently. No combo blocks another.
+- DAG runner: `python3 dispatch-dag.py` — reads job queue, fires stages in dependency order
+- Cron at 4:30 AM → art (GPU exclusive, all combos)
+- Cron at 5:00 AM → weather (network only)
+- Cron at 5:30 AM → DAG runner picks up dialogue → refinement → email
 
 **Parallelism notes:**
 - Ollama handles concurrent requests natively — queues per model, no extra VRAM
@@ -427,6 +442,7 @@ ART ─────────────────────────�
 - Dialogue: bottleneck. 3-worker pool × ~3min/combo = ~15min for 15 combos
 - At 50 combos: either faster models, or stagger sends (6:00-6:30 AM window)
 - Refinement as separate stage lets us swap refiner model without touching dialogue
+- Art cached aggressively — same zone/condition/term = same image across all stations
 
 **Status:** ⬜ TODO (architectural — plan before building)
 
