@@ -361,42 +361,72 @@ There are thousands of observation stations in the US. The cross product of thou
 
 ---
 
-### ARCH1. Modular pipeline — decouple stages, then assemble
-**Issue:** Current dispatch is a monolith — one function loops all combos through all stages sequentially. Slow dialogue blocks art. Failed weather blocks everything. Stages that don't depend on each other still run in series.
+### ARCH1. Decouple pipeline — 5 independent stages
+**Issue:** `garden-dispatch.py` is a monolith. Weather, dialogue, refinement, art, and email are tangled together. One failure cascades. Can't retry a stage without re-running everything. Can't scale stages independently.
 
-**Vision — three decoupled phases, then assemble:**
+**Goal:** 5 standalone stages, each runnable independently, each with its own retry/cache:
 
-**Phase 1: Weather + Art (parallel, no dependencies on each other)**
-- Run ALL weather fetches for all stations (fast, network I/O only)
-- Run ALL art generation for all zone/condition combos (GPU, ~3s each)
-- These two can run simultaneously — art doesn't need weather, weather doesn't need art
-- Can even run on a schedule BEFORE 5:30 AM (weather at 5:00, art overnight)
+**Stage 1: WEATHER** (no dependencies)
+- Fetch NWS weather + AFD for all stations
+- Output: `weather_{station}.json` per station
+- Fast (~1s/station), network-only, can run early (5:00 AM)
+- Failure: retry 3x, skip station on total failure
 
-**Phase 2: Dialogue (the bottleneck — sequential per combo, parallelizable across combos)**
-- Run ALL dialogues for all combos
-- Each dialogue is independent — Tucson/McCarthy doesn't need Portland/Carver
-- Parallelize across combos: `Pool(3)` workers hitting different Ollama models concurrently
-- Within a combo, turns are sequential (turn 5 needs turn 4), can't parallelize
+**Stage 2: DIALOGUE** (depends on: weather)
+- Run LLM dialogue for each (station, author) combo
+- Input: weather JSON + topic bank + character personas + archive memory
+- Output: `dialogue_{station}_{author}.json` (raw turns + metadata)
+- Bottleneck stage — Ollama sequential per combo, parallel across combos
+- Each combo is independent — Portland doesn't need Tucson
+- Pool(3) workers, 3 models concurrent on GPU
 
-**Phase 3: Assemble + Send (fast, depends on phases 1+2)**
-- For each combo: title → masthead (composites art + title) → assemble HTML → send email
-- Only runs when that combo's weather + art + dialogue are all done
-- Email sends per-combo as soon as its assembly completes (first email lands early)
+**Stage 3: REFINEMENT** (depends on: dialogue)
+- Author voice rewrite (Hemingway, Le Guin, etc.)
+- Input: raw dialogue JSON
+- Output: `prose_{station}_{author}.json` (final prose text)
+- Currently baked into dialogue script — extract as standalone
+- Can use different model than dialogue (dolphin-llama3:8b for literary rewrite)
+
+**Stage 4: ART** (no dependencies — can run overnight)
+- Generate masthead art for each (zone, condition) combo
+- Input: zone + weather condition + solar term
+- Output: `art_{zone}_{condition}.png`
+- GPU-bound (~3s/image on SD 1.5), fully cacheable
+- Same zone/condition = same art across stations. ~15 unique combos max.
+
+**Stage 5: EMAIL** (depends on: refinement + art)
+- Assemble HTML: title → masthead composite → prose → template → send
+- Input: prose JSON + art PNG + subscriber list
+- Output: sent emails + delivery log
+- Per-combo as soon as its inputs are ready (first email lands early)
+- Failed sends retry independently
+
+**Dependency graph:**
+```
+WEATHER ──→ DIALOGUE ──→ REFINEMENT ──→ EMAIL
+                                          ↑
+ART ──────────────────────────────────────┘
+```
 
 **Implementation:** Postgres job queue (no external deps):
-- `dispatch_jobs` table: `id, combo_key, run_date, phase, status, started_at, finished_at, error, retry_count`
-- Cron at 5:00 AM → weather + art jobs (phase 1)
-- Cron at 5:30 AM → dialogue jobs (phase 2), then assembly (phase 3)
-- Worker script: `pool(3)` → each worker grabs next pending job → marks done
-- Failed jobs get retried (max 3). No combo blocks another.
-- ~200 lines of new code. No Airflow, no Celery, no Redis.
+- `dispatch_jobs` table: `id, combo_key, run_date, stage, status, started_at, finished_at, error, retry_count`
+- Each stage checks its inputs exist before running
+- `python3 dispatch-stage.py --stage weather --all` / `--stage dialogue --combo BOU/hemingway`
+- Orchestrator script kicks stages in order, but each stage is a standalone CLI
+- Failed jobs retry independently. No combo blocks another.
 
 **Parallelism notes:**
 - Ollama handles concurrent requests natively — queues per model, no extra VRAM
 - 3 different models loaded = 3 truly concurrent inferences on GPU
-- Same model: serializes by default (`OLLAMA_NUM_PARALLEL=1`), can bump to 2 (trades VRAM for throughput)
+- Same model: serializes by default (`OLLAMA_NUM_PARALLEL=1`), can bump to 2
 - Concurrency won't scale linearly on shared GPU — expect 1.5-2x, not 3x
-- Test: benchmark serial vs 3-parallel on current hardware before committing
+
+**Scaling path:**
+- 15 combos today → 50+ combos at scale
+- Weather + art: trivially parallel, done in seconds
+- Dialogue: bottleneck. 3-worker pool × ~3min/combo = ~15min for 15 combos
+- At 50 combos: either faster models, or stagger sends (6:00-6:30 AM window)
+- Refinement as separate stage lets us swap refiner model without touching dialogue
 
 **Status:** ⬜ TODO (architectural — plan before building)
 
