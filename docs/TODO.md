@@ -424,34 +424,52 @@ ART ─────────────────────────�
 **GPU exclusivity — ART gets the whole GPU:**
 - Art generation (SD 1.5 / SD 3.5 / FLUX) needs dedicated VRAM — no Ollama models loaded
 - DAG must enforce: **unload all Ollama models before art, reload after**
-- Sequence: Weather → Art (GPU exclusive) → Dialogue (Ollama loads) → Refinement → Email
-- Or: Art runs overnight/pre-dawn when Ollama is idle. Cache by (zone, condition, term).
+- Art runs overnight/pre-dawn when Ollama is idle. Cache by (zone, condition, term).
 - `curl -s http://localhost:11434/api/generate -d '{"model":"X","keep_alive":0}'` to flush before art
-- Future: if art models get small enough (SD 3.5 Medium ~10GB), could coexist with 1 small Ollama model
 
-**Implementation:** Postgres job queue (no external deps):
-- `dispatch_jobs` table: `id, combo_key, run_date, stage, status, started_at, finished_at, error, retry_count`
-- DAG runner: `python3 dispatch-dag.py` — reads job queue, fires stages in dependency order
-- Cron at 4:30 AM → art (GPU exclusive, all combos)
-- Cron at 5:00 AM → weather (network only)
-- Cron at 5:30 AM → DAG runner picks up dialogue → refinement → email
+**Execution model — two GPU phases, no model switching within either:**
 
-**Dialogue GPU budget: 3-5 models concurrent in 24GB VRAM:**
+**Phase 1: ALL DIALOGUE (load models once, run everything)**
+- Pre-load 3-4 dialogue models. They stay hot the entire phase. Zero cold starts.
+- Run ALL combos through dialogue concurrently: `asyncio.gather(combo1(), combo2(), combo3(), combo4())`
+- Each combo runs its 7-10 turns sequentially (turn 5 needs turn 4, can't parallelize within a combo)
+- Parallelism is ACROSS combos, not within them. Multiple combos share the GPU models.
+- Ollama queues requests to the same model (`OLLAMA_NUM_PARALLEL=1`). When 2 combos hit the same model simultaneously, one waits. This is fine — the other models are serving other combos.
+- 12 characters spread across 3-4 models = good load distribution. Contention is occasional, not constant.
+- No per-turn scheduling, no runtime DAG. Just concurrent combo coroutines sharing a model pool.
+- `OLLAMA_NUM_PARALLEL=2` could double-serve hot models at the cost of some VRAM.
+
+**Phase 2: REFINE → EMAIL loop (per combo, streaming)**
+- Flush all dialogue models. Load one refiner model (gemma3:4b, or bigger if VRAM allows).
+- For each combo that has completed dialogue:
+  - Refine raw dialogue → prose
+  - Assemble HTML (masthead from cached art + prose)
+  - Send email
+  - Move to next combo
+- First email lands while later combos are still refining. Streaming output.
+- One model, one pass, zero switching.
+
+**Dialogue GPU budget: 3-4 models concurrent in 24GB VRAM:**
 - Art is done before dialogue starts — full 24GB available for Ollama
-- Current cast uses 5 models: qwen2.5:3b (3.1GB), qwen3:4b (3.7GB), gemma3:4b (4.3GB), dolphin-llama3:8b (6.0GB), gemma2 (5.4GB)
-- 3 smallest fit comfortably (~11GB). All 5 would need ~22.5GB — tight but possible.
-- DAG pre-loads the models needed for the current run's cast before first dialogue turn
-- Models stay hot across combos (5-min keep_alive is sufficient — turns come faster)
-- Each loaded model = a parallel inference lane. 3 models = 3 combos truly concurrent.
-- Same model serializes by default (`OLLAMA_NUM_PARALLEL=1`), can bump to 2 (trades VRAM)
-- Concurrency won't scale linearly — expect 1.5-2x speedup per added model, not linear
+- Current measured VRAM: qwen2.5:3b (3.1GB), qwen3:4b (3.6GB), gemma3:4b (4.3GB) = 11GB
+- With gemma2 for Muso: +8.7GB = 19.7GB. Fits with headroom.
+- Without gemma2 (Muso on smaller model): 11GB total, massive headroom for bigger refiner.
+- Models stay hot across ALL combos — no unload/reload between combos.
+
+**Implementation:** Dagster for outer DAG (phases + retry + backfill), simple work queue within Phase 1:
+- Dagster assets: `weather` → `art` → `all_dialogue` → `refine_email_loop`
+- `all_dialogue` asset internally runs `asyncio.gather()` across combos
+- `refine_email_loop` asset iterates combos: refine → assemble → send
+- Postgres job queue tracks per-combo status for retry/backfill
+- Cron at 4:30 AM → art (GPU exclusive)
+- Cron at 5:00 AM → weather (network only)
+- Cron at 5:30 AM → Phase 1 (dialogue) → Phase 2 (refine→email)
 
 **Scaling path:**
-- 15 combos today → 50+ combos at scale
+- 15 combos today → 200+ at scale
 - Weather + art: trivially parallel, done in seconds
-- Dialogue: bottleneck. 3-worker pool × ~3min/combo = ~15min for 15 combos
-- At 50 combos: either faster models, or stagger sends (6:00-6:30 AM window)
-- Refinement as separate stage lets us swap refiner model without touching dialogue
+- Dialogue: 4 concurrent combos × ~3min each = ~12min for 15 combos, ~2.5hr for 200
+- At 200+ combos: faster models, `NUM_PARALLEL=2`, or stagger sends across a wider window
 - Art cached aggressively — same zone/condition/term = same image across all stations
 
 ### ARCH1b. Evaluate DAG orchestrator for pipeline
