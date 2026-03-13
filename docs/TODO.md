@@ -454,6 +454,31 @@ ART ─────────────────────────�
 - Refinement as separate stage lets us swap refiner model without touching dialogue
 - Art cached aggressively — same zone/condition/term = same image across all stations
 
+### ARCH1b. Evaluate DAG orchestrator for pipeline
+**Issue:** At scale (15 authors × 128 WFOs = 1,920 possible combos), a Python for-loop won't cut it. Need a real DAG scheduler with parallel fan-out, per-job retry, GPU fencing, and asset caching.
+**Requirements:**
+- DAG with stage dependencies (weather → dialogue → refinement → email, art independent)
+- Fan-out parallelism within stages (200+ combos concurrent where GPU allows)
+- GPU fencing — exclusive VRAM access per stage type (art vs dialogue vs refinement)
+- Per-combo retry without re-running the world
+- Asset tracking — know what's cached, skip what's done, backfill what failed
+- Simple — no K8s, no cloud service, runs on Blackwell, minimal ops burden
+- Python-native — not YAML config hell
+
+**Candidates to evaluate:**
+1. **Dagster** — full data platform, asset-based DAG, sensors, web UI, backfill. Most complete but heaviest. MIT.
+2. **Prefect** — workflow engine, Pythonic decorators, local mode, retries. Cloud-push but works locally. Apache 2.0.
+3. **Hamilton** — micro-framework, function = DAG node, zero infra. No scheduler/retry/parallelism built in — would need a thin Postgres job layer on top.
+4. **Taskiq** — async task queue, broker-agnostic (Postgres backend), lightweight. More Celery-lite than DAG.
+5. **Custom `dispatch-dag.py`** — 200-line Postgres job queue, own the code. No deps but you build everything.
+6. **Makefiles / Just** — file-based deps, parallel `-j`. Awkward for dynamic combos.
+
+**Evaluation criteria:** install complexity, runtime footprint, learning curve, GPU fencing support (custom either way), community/maintenance health, fit for 200-2000 combo scale.
+**Action:** Research top 3 (Dagster, Prefect, Hamilton), prototype the winner with weather+dialogue stages.
+**Status:** ⬜ TODO
+
+---
+
 **Status:** ⬜ TODO (architectural — plan before building)
 
 ### AR3. Art model bakeoff — test alternative image models
