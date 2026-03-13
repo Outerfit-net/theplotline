@@ -430,11 +430,15 @@ ART ─────────────────────────�
 - Cron at 5:00 AM → weather (network only)
 - Cron at 5:30 AM → DAG runner picks up dialogue → refinement → email
 
-**Parallelism notes:**
-- Ollama handles concurrent requests natively — queues per model, no extra VRAM
-- 3 different models loaded = 3 truly concurrent inferences on GPU
-- Same model: serializes by default (`OLLAMA_NUM_PARALLEL=1`), can bump to 2
-- Concurrency won't scale linearly on shared GPU — expect 1.5-2x, not 3x
+**Dialogue GPU budget: 3-5 models concurrent in 24GB VRAM:**
+- Art is done before dialogue starts — full 24GB available for Ollama
+- Current cast uses 5 models: qwen2.5:3b (3.1GB), qwen3:4b (3.7GB), gemma3:4b (4.3GB), dolphin-llama3:8b (6.0GB), gemma2 (5.4GB)
+- 3 smallest fit comfortably (~11GB). All 5 would need ~22.5GB — tight but possible.
+- DAG pre-loads the models needed for the current run's cast before first dialogue turn
+- Models stay hot across combos (5-min keep_alive is sufficient — turns come faster)
+- Each loaded model = a parallel inference lane. 3 models = 3 combos truly concurrent.
+- Same model serializes by default (`OLLAMA_NUM_PARALLEL=1`), can bump to 2 (trades VRAM)
+- Concurrency won't scale linearly — expect 1.5-2x speedup per added model, not linear
 
 **Scaling path:**
 - 15 combos today → 50+ combos at scale
