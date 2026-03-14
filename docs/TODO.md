@@ -671,3 +671,19 @@ Tests we need that don't exist:
 **Status:** ⬜ TODO
 
 ---
+
+### INF8. Database backup notifications
+**Issue:** DB backup runs at 2 AM via system cron (`/opt/plotlines/ops/backup-db.sh`) with no notification. No visibility into success/failure.
+**Fix:** Add start/finish/failure notifications to `backup-db.sh`, same pattern as `run-dispatch.sh`.
+**Status:** ⬜ TODO
+
+### INF9. All production notifications via outerfit.net email
+**Issue:** Cron notifications (dispatch, backup, healthchecks) currently go to `openclaw system event` which only reaches active sessions. Need reliable delivery.
+**Fix:** All production notifications should send email to an outerfit.net address (ops@outerfit.net or similar). Covers:
+- Dispatch start/finish/failure
+- DB backup success/failure
+- Postgres health alerts
+- Any future production cron
+**Status:** ⬜ TODO
+
+---
