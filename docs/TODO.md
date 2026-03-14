@@ -687,3 +687,16 @@ Tests we need that don't exist:
 **Status:** ⬜ TODO
 
 ---
+
+### INF10. Disk usage healthcheck for database
+**Issue:** Postgres crashed when disk filled to capacity (117GB of unauthorized HF model downloads). Nobody noticed until cron failed and matte_d_scry couldn't start OpenClaw.
+**Root cause:** No disk monitoring. Postgres needs WAL write space — when disk is full it crashes and stays down.
+**Fix:**
+- Cron healthcheck: `*/30 * * * *` check `df -h /` — alert at 80%, critical at 90%
+- Specifically monitor `/var/lib/postgresql/` partition
+- Alert via outerfit.net email (INF9)
+- Also check `~/.cache/huggingface/` size — this is what filled disk last time
+- Consider: auto-stop Ollama model downloads if disk < 50GB (rule already in GENART.md, needs enforcement)
+**Status:** ⬜ TODO
+
+---
