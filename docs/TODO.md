@@ -737,3 +737,12 @@ Tests we need that don't exist:
 **Status:** ⬜ TODO
 
 ---
+
+### W5. Remove deprecated `season` variable from weather pipeline
+**Issue:** `garden-weather.py:get_season()` still derives a flat `spring/summer/fall/winter` from the current month and includes it in the weather dict. `garden-dispatch.py` logs it (`condition=cloudy season=spring`) and passes it around. This is the old pre-sekki system — season is now derived from the solar term's `season_bucket` via `garden_seasons.py`.
+**Files:** `garden-weather.py:354-358` (get_season), `garden-weather.py:398` (season in return dict), `garden-dispatch.py:323,385,662-666,754,766` (season references)
+**Fix:** Remove `get_season()` from weather module. Remove `season` from the weather return dict and all dispatch references. Use `term['season_bucket']` everywhere instead (already available in dispatch via `get_current_solar_term()`).
+**Risk:** Low — `season_bucket` from sekki is already used for topic selection, art prompts, and titles. The weather `season` field is vestigial.
+**Status:** ⬜ TODO
+
+---
