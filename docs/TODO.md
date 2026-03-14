@@ -612,3 +612,12 @@ Tests we need that don't exist:
 **Status:** ✅ DONE — commit 8e8f6ea
 
 ---
+
+## 🔴 INFRASTRUCTURE — Code Location
+
+### INF1. Move Plot Lines code out of openclaw repo
+**Issue:** `garden-dialogue.py`, `generate_art.py`, `garden_seasons.py`, and other Plot Lines pipeline code lives in `~/openclaw/skills/garden-conversation/`. The openclaw repo (`~/openclaw/` → `~/.openclaw/workspace`) is OpenClaw's config/workspace directory — it should contain agent configuration, not application code. Only agent persona files and skill configs belong there.
+**Fix:** Move all Plot Lines pipeline code (dialogue, art, seasons, topics, quotes, weather, context) to `/opt/plotlines/scripts/` alongside `garden-dispatch.py`. Update `garden-dispatch.py` imports and OpenClaw agent configs to reference the new paths. Keep persona files (`persona-*.md`) and agent skill config in openclaw — those are agent artifacts.
+**Status:** ⬜ TODO
+
+---
