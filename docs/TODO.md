@@ -621,3 +621,33 @@ Tests we need that don't exist:
 **Status:** ⬜ TODO
 
 ---
+
+### INF2. Hardcoded DB credentials in seed-test-subscribers.py
+**File:** `scripts/seed-test-subscribers.py:18-19`
+**Issue:** Database connection string and encryption key are hardcoded. Should be pulled from environment variables or Bitwarden at runtime.
+**Fix:** Replace hardcoded values with `os.environ.get('DATABASE_URL')` and `os.environ.get('PLOTLINES_ENCRYPTION_KEY')`. Source from `.env` or Bitwarden.
+**Severity:** HIGH (roborev)
+**Status:** ⬜ TODO
+
+### INF3. Hardcoded DB credentials in docs
+**Files:** `SKILL.md:86-87`, `docs/RUNBOOK.md:28,117`
+**Issue:** Database connection strings appear in documentation files. If repo is ever shared or public, credentials are exposed.
+**Fix:** Replace with placeholder `$DATABASE_URL` references. Add note to fetch from `.env` or Bitwarden.
+**Severity:** HIGH (roborev)
+**Status:** ⬜ TODO
+
+### INF4. Subscriber email addresses in docs
+**Files:** `docs/RUNBOOK.md:99-103`, `references/pipeline.md`, `docs/TODO.md`
+**Issue:** Real subscriber email addresses appear in documentation and reference files.
+**Fix:** Replace with anonymized examples (`test@example.com`, `subscriber1@example.com`).
+**Severity:** HIGH (roborev)
+**Status:** ⬜ TODO
+
+### INF5. Unsalted MD5 email hash in seed script
+**File:** `scripts/seed-test-subscribers.py:141-142`
+**Issue:** Email addresses are hashed with plain MD5 (no salt). Trivially reversible for known emails.
+**Fix:** Use HMAC-SHA256 with a secret key, or bcrypt. The hash is used for unsubscribe tokens — needs to be deterministic but not reversible.
+**Severity:** MEDIUM (roborev)
+**Status:** ⬜ TODO
+
+---
