@@ -746,3 +746,15 @@ Tests we need that don't exist:
 **Status:** ⬜ TODO
 
 ---
+
+### W6. Parallelize weather fetches
+**Issue:** Weather fetches run sequentially — one station at a time. With 15 subscribers across 15 stations, each fetch includes observations + forecast + AFD + AFD summary (LLM call). Total weather stage takes several minutes.
+**Fix:** Use `asyncio.gather()` or `concurrent.futures.ThreadPoolExecutor` to fetch all stations in parallel. NWS API calls are I/O-bound (HTTP requests), so threading works fine. AFD summaries (LLM via Ollama) are the bottleneck — could batch or pipeline those.
+**Constraints:**
+- NWS API has no auth but has rate limits — don't hammer. 5-10 concurrent is probably safe.
+- Ollama can only serve one model inference at a time (`NUM_PARALLEL=1`) — AFD summaries will still serialize through the model queue
+- Weather data is per-station, no dependencies between stations — perfectly parallelizable
+**Expected improvement:** Weather stage from ~3-5 min → ~30-60s (limited by AFD summary serialization)
+**Status:** ⬜ TODO
+
+---
