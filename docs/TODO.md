@@ -711,3 +711,22 @@ Tests we need that don't exist:
 **Status:** ⬜ TODO
 
 ---
+
+## 🟢 ART — Hyper-Local Flavor
+
+### ART1. Sub-region + hyper-local forecast in artwork
+**Idea:** Use sub-region descriptions and hyper-local weather to color the art, without expanding dialogue combos. Art caches cheaply (one GPU pass per unique key) and the generation math is manageable — the combo explosion that makes dialogue expensive doesn't apply to art.
+**How:** Art prompt currently uses `(zone, solar_term, condition)`. Add `(sub_region, local_forecast_detail)` to the prompt. A subscriber in Key West gets tropical botanical art; one in Boise gets high desert art — even if they share the same dialogue.
+**Impact:**
+- Art combos expand: `zones × terms × conditions × sub_regions` but these cache — generate once, serve forever for that combo
+- Dialogue combos unchanged: still `(station, author)` grain
+- Hyper-local flavor without multi-agent scaling cost
+**Requires:**
+- Sub-region description injected into art prompt (currently only in dialogue)
+- Local forecast detail (not just condition bucket) passed to art gen
+- Cache key updated to include sub-region
+- Review VRAM/time budget: more unique art = more generation runs, but cached after first
+**Priority:** Nice-to-have — significant rework but high subscriber value
+**Status:** ⬜ TODO
+
+---
