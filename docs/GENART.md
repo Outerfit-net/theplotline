@@ -1,10 +1,30 @@
 # GENART.md — Plot Lines Art Generation
 
-## Current Model: SDXL (stabilityai/stable-diffusion-xl-base-1.0)
-- **Local**, no API cost
-- CLIP 77-token prompt limit — descriptions truncated to 25 words
-- ~7s generation, ~6GB VRAM
-- Quality: decent botanical watercolor, but limited by token budget
+## Available Local Models (as of 2026-03-13)
+
+### SD 3.5 Medium ⭐ (stabilityai/stable-diffusion-3.5-medium) — RECOMMENDED LOCAL
+- **VRAM:** 17.1 GB loaded (fp16), 18.0 GB peak at 1024×384 masthead resolution
+- **Speed:** ~5s at 512×512/25 steps, ~13s at 1024×1024/30 steps (full GPU)
+- **Prompt limit:** 512 tokens (T5 encoder) — full descriptions fit. CLIP encoder still truncates at 77 tokens but T5 carries the detail.
+- **Quality:** Massive upgrade from SD 1.5/SDXL — clean botanical watercolor, delicate layering, proper color gradation
+- **Fits on Blackwell (24 GB)** with 6 GB headroom when Ollama models are unloaded
+- **CPU offload available** but unnecessary during art pipeline stage (Ollama evicted)
+- **CPU offload penalty:** 32.6s vs ~5s — don't use unless Ollama is competing for VRAM
+- **HuggingFace:** gated repo, license accepted, token in Bitwarden "Hugging Face Token"
+- **Cache:** `~/.cache/huggingface/hub/models--stabilityai--stable-diffusion-3.5-medium/` (16 GB)
+
+### SD 1.5 (runwayml/stable-diffusion-v1-5) — CURRENT PIPELINE
+- **VRAM:** ~4 GB
+- **Speed:** ~2.6s at masthead resolution
+- **Prompt limit:** 77 tokens (CLIP only)
+- **Quality:** Flat botanical, adequate but limited
+- **Cache:** 5.2 GB
+
+### SDXL Turbo (stabilityai/sdxl-turbo) — SPEED OPTION
+- **VRAM:** ~3.5 GB
+- **Speed:** 1-4 inference steps, sub-second generation
+- **Quality:** Good for previews/thumbnails, not masthead-quality
+- **Cache:** 3.5 GB
 
 ## Evaluated Models (2026-03-13 Bakeoff)
 
@@ -24,9 +44,20 @@
 - No local GPU needed — art generation doesn't compete with Ollama
 - Conversational models (`generate_content()`) understand natural language prompts
 
-### Local Models (not yet tested)
-- **SD 3.5 Medium** (~5GB, 512 token prompts) — needs HuggingFace license acceptance
-- **Flux schnell** — needs VRAM testing on Blackwell
+### Models Tested & Rejected
+
+| Model | Size | Why Rejected |
+|-------|------|-------------|
+| Playground v2.5 | 58 GB disk | Way too large for 24 GB VRAM, filled disk |
+| FLUX.1 Schnell | 38 GB disk | Way too large, filled disk |
+| PixArt-XL-2 | 21 GB disk | Downloaded without authorization, deleted |
+| SD 3.5 Large Turbo | 15.3 GB model + 9 GB T5 | Exceeds 24 GB VRAM in fp16, needs CPU offload |
+| SDXL Base 1.0 | 14 GB disk | Redundant — SD 3.5 Medium is strictly better |
+
+### Blackwell VRAM Ceiling
+- **Practical max:** ~18 GB loaded in fp16 with headroom for inference
+- Any model >18 GB fp16 loaded requires CPU offload (10x slower) or won't run
+- Future option: fp8/int8 quantized versions of larger models could fit — not a priority
 
 ## Prompt Interface
 
@@ -61,11 +92,22 @@ Vintage hand-drawn botanical watercolor illustration, garden scene, {zone}.
 
 ## Architecture (ARCH1)
 
-### With local model:
-Art runs in GPU-exclusive phase before dialogue. Flush Ollama → generate → flush art model → reload Ollama.
+### With local model (SD 3.5 Medium):
+Art runs in GPU-exclusive phase before dialogue. Flush Ollama → load SD 3.5 Medium (17.1 GB) → generate at 1024×384 → flush art model → reload Ollama for dialogue.
+- Full GPU speed: ~5s per image
+- No CPU offload needed — Ollama models are evicted during art stage
+- Peak VRAM: 18.0 GB at masthead resolution, 6 GB headroom on 24 GB
 
 ### With Gemini API:
 Art is just an API call — runs in parallel with dialogue. No GPU contention. Eliminates the GPU-exclusive art phase entirely.
+
+## Disk Management Rules
+
+- **Check `df -h` before any model download** — refuse if available disk would drop below 50 GB
+- **Never download models >20 GB disk** without explicit approval — they won't fit in VRAM anyway
+- HuggingFace cache lives at `~/.cache/huggingface/hub/`
+- Current cache total: ~24.7 GB (SD 3.5 Medium + SD 1.5 + SDXL Turbo + CLIP)
+- 2026-03-13 incident: 117 GB of unauthorized downloads (Playground 58GB + Flux 38GB + PixArt 21GB) filled disk, crashed gateway
 
 ## History
 
@@ -74,3 +116,6 @@ Art is just an API call — runs in parallel with dialogue. No GPU contention. E
 - **March 13:** Killed `visual_cue` zombie, restored description-based prompts
 - **March 13:** Added CLIP 77-token truncation (25 words) for SDXL
 - **March 13:** Tested Gemini API — no token limit, superior quality, all models accessible
+- **March 13:** SD 3.5 Medium downloaded, tested, verified — 18 GB peak VRAM, fits on Blackwell
+- **March 13:** SDXL Turbo downloaded — speed option for previews
+- **March 13:** Playground v2.5, FLUX.1 Schnell, PixArt-XL deleted — too large, filled disk to capacity

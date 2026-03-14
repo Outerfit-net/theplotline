@@ -382,7 +382,7 @@ ORDER BY
 |-------|----------|--------|
 | Zone Assignment | `(lat, lon, country)` | `{climate_zone_id, hemisphere}` → stored on subscriber at signup, drives all downstream lookups |
 | Weather | `(station_code, zipcode)` | `{condition}` → Art, Title Dict, `{forecast}` → Dialogue |
-| Solar Term | `(climate_zone_id, hemisphere)` | `{season_bucket, season_bucket_description}` → Art, Topic, Dialogue |
+| Solar Term | `(climate_zone_id, hemisphere)` | `{id, name, date, description, season_bucket, zone_offset}` → Art, Topic, Dialogue |
 | Sub-region | `(station_code, climate_zone_id)` | `{sub_region_description}` → Dialogue |
 | Topic ⚠️ TODO: generate 14 per `(season_bucket, climate_zone_id)` | `(season_bucket, climate_zone_id)` | `{topic}` → Dialogue |
 | Quote ⚠️ TODO: `garden-quotes.py`, 14 per `season_bucket` | `(season_bucket)` | `{quote}` → Dialogue, Delivery |
@@ -605,7 +605,7 @@ All static lookup data used by the pipeline.
 | `title_dict.py` | Title Dict | `(season_bucket=sekki_name, climate_zone_id, condition)` | `{title}` |
 | `authors.json` | Author Voice | `(author_key)` | `{author_voice}` |
 | `persona-*.md` | Character Souls | `(character_key)` | `{character_soul}` |
-| `garden-dialogue.py` | Dialogue | `(author_key, {forecast, season_bucket_description, sub_region_description, topic, quote, author_voice, character_souls})` | `{prose}` |
+| `garden-dialogue.py` | Dialogue | `(author_key, {soul, character_memory, date, sekki{name, season_bucket, date, description}, weather_report, garden_context, topic, quote, participants, convo_so_far})` | `{prose}` |
 | `garden-assembler.py` | Email Template | `({url, prose, quote, unsubscribe_token})` | `{html}` |
 | `garden-mailer.py` | Delivery | `(email_address, {html})` | `email sent` |
 | `garden-dispatch.py` | Orchestrator | all of the above | coordinates full DAG |
@@ -613,8 +613,6 @@ All static lookup data used by the pipeline.
 ---
 
 ## Dialogue — History, Memory & Archive
-
-⚠️ **TODO: This section describes current implementation. Needs review and improvement — see TODOs below.**
 
 ### Where History Lives
 
@@ -638,11 +636,12 @@ Two types of history are injected at prompt time:
 - Injected into `generate_topic()` prompt to prevent repeats
 - Lightweight — just the metadata lines, not full prose
 
-**2. Character memory (`read_character_memory`)** — last 7 days
-- Reads the FULL archive file content for each character's past conversations
-- Injected into each character's prompt at bootstrap and each turn
+**2. Character memory (`read_character_memory`)** — last 2 days, 2000 char cap
+- Reads the FULL archive file content for days this character participated
+- Injected into prompt section 2 (MEMORY), immediately after identity
 - Enables callbacks: "Like I said before...", "Remember when we talked about..."
-- Can be large — 7 days × full prose per day
+- Filtered: only includes archives where this character's name appears in `**Characters:**` line
+- Capped: `max_days=2`, `max_chars=2000` — respects small model context windows
 
 ### How Archive is Written
 
@@ -654,9 +653,6 @@ After dialogue completes, `write_archive()` writes a single `.md` file with:
 ### TODOs
 
 - **Archive lives outside the repo** (`~/.openclaw/workspace-garden/`) — not backed up, not version controlled. Should be stored in Postgres `daily_runs` table (already exists) and served from there.
-- **7 days of full prose in every character prompt** — expensive. Should summarize or truncate older entries.
-- **No per-character memory** — every character gets the same full archive. Should be filtered to conversations that character actually participated in.
-- **`read_character_memory` loads full prose** — at 7 days this can be 10K+ tokens per character before the conversation even starts. Needs a cap or summarization step.
 - **Archive path uses `afd_station`** — should use `(station_code, author_key)` to match master query grain.
 
 ---
@@ -669,7 +665,7 @@ One row per object. Every input and output explicit. Every group by defined.
 |-------|----------|--------|--------|
 | Climate Zone | `(lat, lon, country)` | signup form | `{climate_zone_id, hemisphere}` → stored on subscriber, drives all downstream lookups |
 | Weather | `(station_code, zipcode)` | NWS + Open-Meteo APIs | `{condition, forecast}` → Art, Title Dict, Garden Context |
-| Solar Term | `(climate_zone_id, hemisphere)` | `garden_seasons.py` | `{season_bucket, season_bucket_description}` → Art, Topic, Garden Context |
+| Solar Term | `(climate_zone_id, hemisphere)` | `garden_seasons.py` | `{id, name, date, description, season_bucket, zone_offset}` → Art, Topic, Garden Context, Dialogue |
 | Sub-region | `(station_code, climate_zone_id)` | `sub-regions.js` | `{sub_region_description}` → Garden Context |
 | Topic | `(season_bucket, climate_zone_id)` | `topic_bank_24.py` | `{topic}` → Garden Context |
 | Quote | `(season_bucket)` | `garden_quotes.py` | `{quote}` → Garden Context, Delivery |
@@ -724,11 +720,11 @@ One row per object. Every input and output explicit. Every group by defined.
 |------|-------------|--------|-------|
 | Character selection | Pick 3–5 randomly from 12 | `(author_key, --num-chars)` | `random.sample(CAST, 3-5)`, then shuffled |
 | Session bootstrap | Spawn one OpenClaw session per character | `(character_key, model)` | One persistent session per run |
-| Character bootstrap | Each character gets first prompt, says hello | `{name, date, season_context, topic, quote, weather_report, garden_context, char_memory, convo_so_far}` | One turn each in order |
-| Dialogue loop | Characters take turns, weighted random speaker | Last 6 turns of `{hist}` + `{char_memory, other_personas, weather_report, garden_context, topic, quote}` | 6–10 turns, max `total_turns × 3` attempts |
+| Character bootstrap | Each character gets first prompt, says hello | Sections: `<identity>{soul}</identity>` → `<memory>{char_memory}</memory>` → `<world>{date, sekki, weather, garden_context, topic, quote, participants}</world>` → `<conversation>{convo_so_far}</conversation>` → `<instruction>` | One turn each in order. Only `<conversation>` grows (~50 tokens/char). |
+| Dialogue loop | Characters take turns, weighted random speaker | Same section order. `<conversation>` uses windowed `hist[-6:]` instead of full hist. | 6–10 turns, max `total_turns × 3` attempts. Fixed ~1400-1900 tokens/turn. |
 | Speaker weighting | Previous speaker gets 0.1 weight, others 1.0 | `(last_speaker_idx)` | Prevents monologue |
 | Other personas | Every non-speaking character's full persona injected | `persona-*.md` for all others | So each knows who they're talking to |
-| Character memory | Last 7 days full archive per character | `archive/<station>/<author>/` | Injected every turn |
+| Character memory | Last 2 days archive per character (2000 char cap) | `archive/<station>/<author>/` | Injected in `<memory>` section (section 2), every turn |
 | Retry logic | 2 retries per turn if output fails parse | `(output, dt, SLOW_CALL_S=30s)` | Falls back if slow or fallbackish |
 | Author voice — haiku pass | Haiku drafts prose from raw dialogue | `{hist, author_style}` | 120s timeout |
 | Author voice — sonnet pass | Sonnet refines to final prose | `{haiku_draft, author_style}` | **800 char hard limit** |
