@@ -758,3 +758,13 @@ Tests we need that don't exist:
 **Status:** ⬜ TODO
 
 ---
+
+### W7. Track AFD summary execution time + use fastest model
+**Issue:** AFD summaries run through `plotlines-orchestrator-local` (qwen2.5:3b) but we don't log execution time per summary. No visibility into how much of the weather stage is LLM vs HTTP. The summary task is straightforward — extract key garden-relevant details from a weather text blob — and doesn't need a larger model.
+**Fix:**
+- Log execution seconds per AFD summary call (start/end timestamps in weather log)
+- Evaluate whether the current model (qwen2.5:3b) is the fastest option or if a smaller/faster model would work. The task is simple extraction, not reasoning.
+- Consider: could this be done without an LLM at all? Regex/keyword extraction from AFD text might be sufficient and instant.
+**Status:** ⬜ TODO
+
+---
