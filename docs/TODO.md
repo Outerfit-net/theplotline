@@ -651,3 +651,23 @@ Tests we need that don't exist:
 **Status:** ⬜ TODO
 
 ---
+
+## 🔴 INFRASTRUCTURE — Healthchecks
+
+### INF6. PostgreSQL health monitoring
+**Issue:** Postgres cluster went down (status: `down` in `pg_lsclusters`) and nothing noticed until cron failed. matte_d_scry had to manually `sudo systemctl start postgresql@14-main`.
+**Fix:** Add a healthcheck that runs before dispatch (preflight already checks DB, but should alert independently). Options:
+- System cron: `*/15 * * * * pg_isready || openclaw system event --text "🔴 Postgres DOWN"`
+- Or add to OpenClaw heartbeat checklist
+**Status:** ⬜ TODO
+
+### INF7. Cron start/finish notifications
+**Issue:** No visibility into whether the daily dispatch started or finished. Failures were silent.
+**Fix (DONE — partial):** `run-dispatch.sh` now sends `openclaw system event` on start and completion/failure. But these go to the main agent session — need to also deliver to Telegram (matte_d_scry at 8233843319) and moltibot.
+**Remaining:**
+- Wire `openclaw system event` to deliver to Telegram target
+- Or use direct Telegram API call in run-dispatch.sh as fallback
+- Consider adding to all production crons, not just Plot Lines
+**Status:** ⬜ TODO
+
+---
