@@ -700,3 +700,14 @@ Tests we need that don't exist:
 **Status:** ⬜ TODO
 
 ---
+
+## 🟡 WEATHER — Observation Station
+
+### W4. Skip WFO station in observation fetch — go straight to substation
+**Issue:** `fetch_current_conditions()` always tries the WFO station code (`obs_station` from NWS points lookup) first, which 404s because WFO codes aren't real observation stations. Then falls back to `_nearest_obs_stations()` via lat/lon gridpoint lookup, which succeeds. This causes a logged error on every single weather fetch — noisy and adds ~1-2s latency per subscriber.
+**File:** `garden-weather.py:152`
+**Fix:** Skip the WFO station entirely. Call `_nearest_obs_stations(lat, lon)` directly and iterate that list. The `obs_station` from `resolve_by_*()` is only useful for the AFD lookup (`afd_station`), not for observations.
+**Alternative:** At resolve time, store the first real observation station separately from the AFD station. Currently `obs_station` and `afd_station` conflate two different things.
+**Status:** ⬜ TODO
+
+---
