@@ -726,6 +726,7 @@ Tests we need that don't exist:
 - Local forecast detail (not just condition bucket) passed to art gen
 - Cache key updated to include sub-region
 - Review VRAM/time budget: more unique art = more generation runs, but cached after first
+**Example:** Grand Junction and Vail share the same WFO station (GJT) and get the same dialogue. But Grand Junction's sub-region is "intermountain west" → arid mesa botanical art. Vail's sub-region is "mountains" → alpine wildflower art. Same conversation, different paintings. Flavor at the eyeball level, efficiency at the compute level.
 **Priority:** Nice-to-have — significant rework but high subscriber value
 **Status:** ⬜ TODO
 
