@@ -232,9 +232,30 @@ The `term` dict from `get_current_solar_term()` contains:
 
 ---
 
-## Next Steps
+## Agent Identity — Source of Truth
+
+Each character is a registered OpenClaw agent with its own workspace:
+
+```
+~/.openclaw/workspace-{char}/SOUL.md  →  ~/openclaw/workspace-{char}/SOUL.md (symlink)
+```
+
+The workspace SOUL.md is the **source of truth** for character identity. OpenClaw injects it
+automatically when the agent is called via `openclaw agent --agent {char}`.
+
+**Current state (2026-03-14):** The `<identity>` section in the prompt ALSO injects the persona
+via `readp(pf)` (reads `persona-{char}.md`). This is redundant — the agent system already
+provides identity. The persona files match SOUL.md (merged 2026-03-14).
+
+**Future cleanup:** Remove `<identity>` from prompt, delete `persona-*.md` files. The prompt
+should only contain: `<memory>` → `<world>` → `<conversation>` → `<instruction>`.
+
+---
+
+## Done
 
 1. ✅ Document correct bootstrap and turn interfaces (this file)
-2. ⬜ Fix `garden-dialogue.py` — restructure prompt sections, add `season_bucket` + `date` to sekki
-3. ⬜ Update `THE-GARDEN-architecture.md` object model table to match reality
-4. ⬜ Update Dialogue Breakdown table to reflect correct prompt structure
+2. ✅ Fix `garden-dialogue.py` — restructure prompt sections with XML tags, add full sekki (commit `bac5458`)
+3. ✅ Update `THE-GARDEN-architecture.md` object model table to match reality (commit `c87d0a7`)
+4. ✅ Bind each character agent to its own workspace (commit `595b86d`)
+5. ⬜ Remove `<identity>` from prompt — agent system handles it (future cleanup)
