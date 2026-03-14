@@ -708,6 +708,12 @@ Tests we need that don't exist:
 **File:** `garden-weather.py:152`
 **Fix:** Skip the WFO station entirely. Call `_nearest_obs_stations(lat, lon)` directly and iterate that list. The `obs_station` from `resolve_by_*()` is only useful for the AFD lookup (`afd_station`), not for observations.
 **Alternative:** At resolve time, store the first real observation station separately from the AFD station. Currently `obs_station` and `afd_station` conflate two different things.
+**Example log output:**
+```
+[weather] CONDITIONS KEY → FAIL: HTTP Error 404: Not Found
+[weather] CONDITIONS KEYW → Mostly Clear, 81°F
+```
+`KEY` (WFO code) always 404s. `KEYW` (substation) succeeds. The first call is wasted.
 **Status:** ⬜ TODO
 
 ---
@@ -726,7 +732,7 @@ Tests we need that don't exist:
 - Local forecast detail (not just condition bucket) passed to art gen
 - Cache key updated to include sub-region
 - Review VRAM/time budget: more unique art = more generation runs, but cached after first
-**Example:** Grand Junction and Vail share the same WFO station (GJT) and get the same dialogue. But Grand Junction's sub-region is "intermountain west" → arid mesa botanical art. Vail's sub-region is "mountains" → alpine wildflower art. Same conversation, different paintings. Key West (same Florida WFO) gets tropical bougainvillea art while Miami gets subtropical. Flavor at the eyeball level, efficiency at the compute level.
+**Example:** Grand Junction and Vail share the same WFO station (GJT) and get the same dialogue. But Grand Junction's sub-region is "intermountain west" → arid mesa botanical art. Vail's sub-region is "mountains" → alpine wildflower art. Same conversation, different paintings. Key West (same Florida WFO) gets tropical bougainvillea art while Miami gets subtropical. Condition matters too: raining in Vail and sunny in Grand Junction → different art even for the same sub-region visit. Flavor at the eyeball level, efficiency at the compute level.
 **Priority:** Nice-to-have — significant rework but high subscriber value
 **Status:** ⬜ TODO
 
